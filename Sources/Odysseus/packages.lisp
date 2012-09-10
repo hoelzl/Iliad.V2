@@ -47,7 +47,7 @@
    #:primitive-term #:value
    #:functor-term
    #:number-term
-   #:compound-term #:is-compound-term #:operator
+   #:compound-term #:is-compound-term #:operator #:term-type-for-operator
    #:application-term #:arguments
    #:unknown-general-application-term
    #:known-compound-term 

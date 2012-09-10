@@ -93,7 +93,7 @@ argument list."
 
 (defmethod parse-into-term-representation ((exp cons) (context compilation-context))
   (let* ((operator (first exp))
-	 (known-type (gethash operator (known-operators context) nil))
+	 (known-type (term-type-for-operator operator context nil))
          (term (if known-type
                    (make-instance known-type :context context)
                    (make-instance 'unknown-general-application-term

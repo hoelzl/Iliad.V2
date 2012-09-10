@@ -175,6 +175,15 @@ structure."))
 (defgeneric operator (compound-term)
   (:documentation "The operator of COMPOUND-TERM."))
 
+(defgeneric term-type-for-operator (operator context &optional default)
+  (:documentation
+   "Returns a symbol naming the type of a compound term with operator OPERATOR.")
+  (:method ((operator symbol) context &optional (default nil))
+    (assert context (context)
+            "Cannot lookup operator from symbol without compilation context.")
+    (gethash operator (known-operators context) default)))
+                 
+
 (defclass operator-mixin ()
   ((operator :accessor operator :initarg :operator
              :initform (required-argument :operator) :type term))
@@ -437,7 +446,7 @@ or :ARG3 init-keywords is also provided."
    "Representation of an existentially quantified statement."))
 
 (defmethod operator ((term existential-quantification-term))
-  'foreach)
+  'exists)
 
 (defglobal *logical-operators*
     '(and            conjunction-term
