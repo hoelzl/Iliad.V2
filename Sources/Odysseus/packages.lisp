@@ -31,6 +31,9 @@
   (:nicknames #:syntax)
   (:shadow #:conjoin #:disjoin)
   (:export 
+   #:primitive-action-definition #:context
+   #:action-type #:action-precondition #:action-successor-state
+   #:make-primitive-action #:define-primitive-action
    #:name-mixin #:required-name-mixin #:name
    #:arguments-mixin #:arguments
    #:known-term #:is-known-term-p
@@ -41,13 +44,14 @@
    #:compilation-unit
    #:local-context #:outer-context #:local-variables
 
-   #:term
-   #:variable-term
+   #:term #:source
+   #:variable-term #:unique-name #:make-variable-term 
    #:atomic-term
    #:primitive-term #:value
    #:functor-term
    #:number-term
-   #:compound-term #:is-compound-term #:operator #:term-type-for-operator
+   #:compound-term #:is-compound-term #:operator
+   #:term-type-for-operator
    #:application-term #:arguments
    #:unknown-general-application-term
    #:known-compound-term 
@@ -56,7 +60,7 @@
    #:binary-term #:lhs #:rhs
    #:ternary-term #:arg1 #:arg2 #:arg3
    #:known-general-application-term
-   #:body-term
+   #:body-term #:body
    #:binding #:binding-variable #:binding-keywords #:binding-context
    #:binding-term #:bound-variables #:bindings
 
@@ -80,6 +84,9 @@
    #:conditional-term
    #:while-loop-term
    #:search-term
+   #:concurrent-term
+   #:prioritized-concurrent-term
+   #:spawn-term
 
    #:definition-term
    #:primitive-action-definition-term
@@ -106,6 +113,9 @@
    #:pick #:pick-argument #:choose-argument
    #:repeat #:loop #:iterate
    #:if #:while #:search #:offline
+   #:concurrently #:in-parallel
+   #:prioritized #:when-blocked
+   #:spawn #:new-process
 
    #:define-primitive-action #:defaction #:defprimitive
    #:primitive-action #:primact
