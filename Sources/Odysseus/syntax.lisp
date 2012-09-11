@@ -1099,3 +1099,19 @@ or :ARG3 init-keywords is also provided."
 
 (defmethod (setf fluents) (new-value (context local-context))
   (setf (fluents (outer-context context)) new-value))
+
+;;; Some utilities for interactive exploration
+
+(defun default-known-classes ()
+  (let ((result '()))
+    (doplist (op class *default-known-operators*)
+      (declare (ignorable op))
+      (pushnew class result))
+    result))
+
+(defun default-known-cpls ()
+  (mapcar (lambda (class)
+            (cons class 
+                  (ignore-errors
+                   (sb-mop:class-precedence-list (find-class class)))))
+          (default-known-classes)))
