@@ -88,10 +88,16 @@ argument list."
 	 (known-type (term-type-for-operator operator context nil))
          (term (cond (known-type
                       (make-instance known-type :context context :source exp))
-                     ((let ((primitive-action-term-definition
+                     ((let ((primitive-action-definition
                               (gethash operator (primitive-actions context) nil)))
-                        (if primitive-action-term-definition
-                            (make-instance (action-type primitive-action-term-definition)
+                        (if primitive-action-definition
+                            (make-instance (action-class primitive-action-definition)
+                                           :context context :source exp)
+                            nil)))
+                     ((let ((fluent-definition
+                              (gethash operator (fluents context) nil)))
+                        (if fluent-definition
+                            (make-instance (fluent-class fluent-definition)
                                            :context context :source exp)
                             nil)))
                      (t

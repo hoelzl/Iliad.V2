@@ -32,6 +32,16 @@
              :initform (required-argument :operator)))
   (:documentation "Mixin that provides an OPERATOR slot."))
 
+(defgeneric context (thing)
+  (:documentation "The compilation context in which THING is relevant."))
+
+(defclass context-mixin ()
+  ((context
+    :accessor context :initarg :context 
+    :initform (required-argument :context)
+    :documentation "The context to which this object belongs."))
+  (:documentation "Mixin that provides a CONTEXT slot."))
+   
 
 ;;; Primitive Actions
 ;;; =================
@@ -39,44 +49,43 @@
 ;;; The definition of a primitive action is provided by instances of
 ;;; PRIMITIVE-ACTION-DEFINITION.
 
+(defgeneric primitive-actions (context)
+  (:documentation
+   "A hash table containing the description of each primitive action known in
+   CONTEXT."))
+
+;;; TODO: See (setf known-operators).
+(defgeneric (setf primitive-actions) (new-value context))
+
 (defgeneric primitive-action-definition (action-name context &optional default)
   (:documentation 
-   "Returns the signature of the primitive action ACTION-NAME in CONTEXT.")
+   "Returns the definition of the primitive action ACTION-NAME in CONTEXT.")
   (:method ((action-name symbol) context &optional (default nil))
     (assert context (context)
-            "Cannot look-up primitive-action symbol without context.")
+            "Cannot look up primitive-action symbol without context.")
     (gethash action-name (primitive-actions context) default)))
 
 (defgeneric (setf primitive-action-definition) (new-value action-name context)
   (:documentation
-   "Set the signature for primitive action ACTION-NAME in CONTEXT to
+   "Set the definition for primitive action ACTION-NAME in CONTEXT to
 NEW-VALUE.")
   (:method (new-value (action-name symbol) context)
     (setf (gethash action-name (primitive-actions context)) new-value)))
 
-(defclass primitive-action-definition (operator-mixin)
-  ((context
-    :accessor context :initarg :context 
-    :initform (required-argument :context)
-    :documentation "The context to which this action belongs.")
-   (action-type
-    :accessor action-type :initarg :type
-    :initform (required-argument :type)
-    :documentation "The type of this primitive action.")
+(defclass primitive-action-definition (operator-mixin context-mixin)
+  ((action-class
+    :accessor action-class :initarg :class
+    :initform (required-argument :class)
+    :documentation "The class of this primitive action.")
    (action-precondition
     :accessor action-precondition :initarg :precondition
     :initform nil
-    :documentation "The precondition for this action.")
-   (action-successor-state
-    :accessor action-successor-state :initarg :successor-state
-    :initform nil
-    :documentation "The successor state axiom for this action."))
+    :documentation "The precondition for this action."))
   (:documentation
    "The definition of a primitive action."))
 
-(defmethod shared-initialize :after
-    ((self primitive-action-definition) slot-names
-     &key context operator action-precondition action-successor-state)
+(defmethod shared-initialize :after ((self primitive-action-definition) slot-names
+                                     &key context operator action-precondition)
   (assert context (context)
           "Cannot create a primitive action definition without context.")
   (assert (and operator (symbolp operator)) (operator)
@@ -85,39 +94,148 @@ NEW-VALUE.")
   (when (and action-precondition (consp action-precondition)
              (or (eql slot-names t) (member 'action-precondition slot-names)))
     (setf (slot-value self 'action-precondition)
-          (parse-into-term-representation action-precondition context)))
-  (when (and action-successor-state (consp action-successor-state)
-             (or (eql slot-names t) (member 'action-successor-state slot-names)))
-    (setf (slot-value self 'action-successor-state)
-          (parse-into-term-representation action-successor-state context))))
+          (parse-into-term-representation action-precondition context))))
 
-(defgeneric make-primitive-action (operator class-name context)
+(defgeneric declare-primitive-action (operator context &optional class-name)
   (:documentation
-   "Create a new instance of CLASS-NAME and assign it as primitive-action
-definition for OPERATOR in CONTEXT.")
-  (:method ((operator symbol) (class-name symbol) context)
+   "Create a new instance of PRIMITIVE-ACTION-DEFINITION and assign it as
+primitive-action definition for OPERATOR in CONTEXT.")
+  (:method ((operator symbol) context
+            &optional (class-name (symbolicate operator '#:-term)))
     (setf (primitive-action-definition operator context)
           (make-instance 'primitive-action-definition
-                         :operator operator :type class-name))))
+                         :operator operator :class class-name :context context))))
 
-(defmacro define-primitive-action
-    (operator class-name
-     &key action-type action-precondition action-successor-state)
+(defmacro define-primitive-action (operator
+                                   &key (class-name (symbolicate operator '#:-term))
+                                        precondition)
   `(progn
      (defclass ,class-name (primitive-action-term)
-       ()
-       (:default-initargs))
+       ())
      (defmethod operator ((term ,class-name))
        ',operator)
-     (defmethod make-primitive-action
-       ((operator (eql ',operator)) (class-name (eql ',class-name)) context)
+     (defmethod declare-primitive-action
+       ((operator (eql ',operator)) context &optional (class-name ',class-name))
        (setf (primitive-action-definition operator context)
              (make-instance 'primitive-action-definition
                             :operator ',operator
-                            :type ',class-name
-                            :type ',action-type
-                            :precondition ',action-precondition
-                            :successor-state ',action-successor-state
+                            :class class-name
+                            :precondition ',precondition
+                            :context context)))))
+
+
+;;; Fluent Definitions
+;;; ==================
+
+;;; The definition of fluents is provided by (indirect) instances of FLUENT-DEFINITION.
+
+(defgeneric fluents (context)
+  (:documentation
+   "A hash table containing the description of every fluent in CONTEXT."))
+
+;;; TODO: see (setf known-operators)
+(defgeneric (setf fluents) (new-value context))
+
+(defgeneric fluent-definition (fluent-name context &optional default)
+  (:documentation
+   "Returns the definition of the fluent FLUENT-NAME in CONTEXT.")
+  (:method ((fluent-name symbol) context &optional (default nil))
+    (assert context (context)
+            "Cannot look up fluent symbol without context.")
+    (gethash fluent-name (fluents context) default)))
+
+(defgeneric (setf fluent-definition) (new-value fluent-name context)
+  (:documentation
+   "Set the definition for fluent FLUENT-NAME in CONTEXT to NEW-VALUE.")
+  (:method (new-value (fluent-name symbol) context)
+    (setf (gethash fluent-name (fluents context)) new-value)))
+
+(defclass fluent-definition (operator-mixin context-mixin)
+  ((fluent-class
+    :accessor fluent-class :initarg :class
+    :initform (required-argument :class)
+    :documentation "The class of this fluent.")
+   (fluent-successor-state
+    :accessor fluent-successor-state :initarg :successor-state
+    :initform nil
+    :documentation "The successor state axiom for this fluent."))
+  (:documentation "The definition of a fluent."))
+
+
+(defmethod shared-initialize :after ((self fluent-definition) slot-names
+                                     &key context operator fluent-successor-state)
+  (assert context (context)
+          "Cannot create a fluent definition without context.")
+  (assert (and operator (symbolp operator)) (operator)
+          "Cannot create a fluent definition without operator.")
+  (setf (fluent-definition operator context) self)
+  (when (and fluent-successor-state (consp fluent-successor-state)
+             (or (eql slot-names t) (member 'fluent-successor-state slot-names)))
+    (setf (slot-value self 'fluent-successor-state)
+          (parse-into-term-representation fluent-successor-state context))))
+
+
+(defclass relational-fluent-definition (fluent-definition)
+  ()
+  (:documentation "The definition of a relational fluent."))
+
+(defgeneric declare-relational-fluent (operator context &optional class-name)
+  (:documentation
+   "Create a new instance of RELATIONAL-FLUENT-DEFINITION and assign it as
+fluent definition for OPERATOR in CONTEXT.")
+  (:method ((operator symbol) context
+            &optional (class-name (symbolicate operator '#:-term)))
+    (setf (fluent-definition operator context)
+          (make-instance 'relational-fluent-definition
+                         :operator operator :class class-name :context context))))
+
+(defmacro define-relational-fluent (operator
+                                    &key (class-name (symbolicate operator '#:-term))
+                                         successor-state)
+  `(progn
+     (defclass ,class-name (known-general-application-term)
+       ())
+     (defmethod operator ((term ,class-name))
+       ',operator)
+     (defmethod declare-relational-fluent
+       ((operator (eql ',operator)) context &optional (class-name ',class-name))
+       (setf (fluent-definition operator context)
+             (make-instance 'relational-fluent-definition
+                            :operator ',operator
+                            :class class-name
+                            :successor-state ',successor-state
+                            :context context)))))
+
+
+(defclass functional-fluent-definition (fluent-definition)
+  ()
+  (:documentation "The definition of a functional fluent."))
+
+(defgeneric declare-functional-fluent (operator context &optional class-name)
+  (:documentation
+   "Create a new instance of FUNCTIONAL-FLUENT-DEFINITION and assign it as
+fluent definition for OPERATOR in CONTEXT.")
+  (:method ((operator symbol) context
+            &optional (class-name (symbolicate operator '#:-term)))
+    (setf (fluent-definition operator context)
+          (make-instance 'functional-fluent-definition
+                         :operator operator :class class-name :context context))))
+
+(defmacro define-functional-fluent (operator
+                                    &key (class-name (symbolicate operator '#:-term))
+                                         successor-state)
+  `(progn
+     (defclass ,class-name (known-general-application-term)
+       ())
+     (defmethod operator ((term ,class-name))
+       ',operator)
+     (defmethod declare-functional-fluent
+       ((operator (eql ',operator)) context &optional (class-name ',class-name))
+       (setf (fluent-definition operator context)
+             (make-instance 'functional-fluent-definition
+                            :operator ',operator
+                            :class class-name
+                            :successor-state ',successor-state
                             :context context)))))
 
 ;;; Names
@@ -188,24 +306,13 @@ definition for OPERATOR in CONTEXT.")
 ;;; with regards to lexical/dynamic scoping?
 (defgeneric (setf known-operators) (new-value context))
 
-(defgeneric primitive-actions (context)
-  (:documentation
-   "A hash-table containing the description of each primitive action known in
-   CONTEXT."))
-
-;;; TODO: See (setf known-operators).
-(defgeneric (setf primitive-actions) (new-value context))
-
 ;;; Terms
 ;;; =====
 
 ;;; We define an ambivalent syntax, similar to Prolog.  
 
-(defclass term ()
-  ((context
-    :accessor context :initarg :context
-    :initform (required-argument :context)
-    :documentation "Backlink to the context in which this term was created."))
+(defclass term (context-mixin)
+  ()
   (:documentation
    "Superclass for all terms.  Since we don't distinguish between terms,
    expressions and statements, every syntactic element inherits from this
@@ -855,7 +962,11 @@ or :ARG3 init-keywords is also provided."
    (primitive-actions
     :accessor primitive-actions :initarg :primitive-actions
     :initform (make-hash-table)
-    :documentation "Hash table mapping each primitive action to its signature.")
+    :documentation "Hash table mapping each primitive action to its definition.")
+   (fluents
+    :accessor fluents :initarg :fluents
+    :initform (make-hash-table)
+    :documentation "Hash table mapping each fluent to its definition.")
    (variable-hash-table
     :accessor variable-hash-table :initarg :variable-hash-table
     :initform (make-hash-table)
@@ -982,3 +1093,9 @@ or :ARG3 init-keywords is also provided."
 
 (defmethod (setf primitive-actions) ((new-value list) (context local-context))
   (setf (primitive-actions (outer-context context)) new-value))
+
+(defmethod fluents ((context local-context))
+  (fluents (outer-context context)))
+
+(defmethod (setf fluents) (new-value (context local-context))
+  (setf (fluents (outer-context context)) new-value))

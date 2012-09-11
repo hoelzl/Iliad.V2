@@ -32,8 +32,14 @@
   (:shadow #:conjoin #:disjoin)
   (:export 
    #:primitive-action-definition #:context
-   #:action-type #:action-precondition #:action-successor-state
-   #:make-primitive-action #:define-primitive-action
+   #:action-class #:action-precondition
+   #:declare-primitive-action #:define-primitive-action
+   #:fluent-definition
+   #:fluent-class #:fluent-successor-state
+   #:relational-fluent-definition
+   #:declare-relational-fluent #:define-relational-fluent
+   #:functional-fluent-definition
+   #:declare-functional-fluent #:define-functional-fluent
    #:name-mixin #:required-name-mixin #:name
    #:arguments-mixin #:arguments
    #:known-term #:is-known-term-p
