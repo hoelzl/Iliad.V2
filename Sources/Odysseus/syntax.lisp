@@ -763,6 +763,14 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "A term that represents the empty program."))
 
+(defgeneric is-final-term-p (term)
+  (:documentation
+   "Returns true if TERM is final.")
+  (:method (term)
+    nil)
+  (:method ((term empty-program-term))
+    t))
+
 (defclass primitive-action-term (known-general-application-term)
   ((argument :accessor action :initarg :action))
   (:documentation
@@ -783,6 +791,9 @@ or :ARG3 init-keywords is also provided."
 
 (defmethod operator ((term sequence-term))
   'seq)
+
+(defmethod is-final-term-p ((term sequence-term))
+  (null (body term)))
 
 (defclass action-choice-term (body-term)
   ()

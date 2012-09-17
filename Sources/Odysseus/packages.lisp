@@ -81,6 +81,7 @@
    #:existential-quantification-term
 
    #:empty-program-term
+   #:is-final-term-p
    #:primitive-action-term
    #:test-term
    #:sequence-term
@@ -135,7 +136,7 @@
   (:shadowing-import-from #:odysseus-syntax
         #:conjoin #:disjoin)
   (:export
-   )
+   #:interpret #:interpret-and-print)
   ;; Re-export symbols from odysseus-utilities
   (:export
    ;; General utilities
