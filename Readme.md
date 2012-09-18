@@ -41,6 +41,29 @@ Odysseus
  services and strategies.  It uses Mark Stickel's Snark theorem prover
  as the logical inference engine.
 
+Installation and Execution
+--------------------------
+
+To run *Iliad* you need:
+* One of the supported Lisp implementations (CCL, CMUCL, ECL or SBCL,
+  see below for the exact versions that we are using)
+* ASDF (which should be included in the implementation of your choice)
+
+Currently we do not provide scripts to run *Iliad* from the command line.
+
+Supported Lisp Implementations
+------------------------------
+
+*Iliad* has been tested on the folowing implementations running on OSX:
+* Armed Bear Common Lisp: 1.0.1-svn-13750-13751
+* Clozure Common Lisp: Version 1.8-r15378M  (DarwinX8664)
+* CMU Common Lisp: 20c release-20c (20C Unicode)
+* ECL: 12.7.1
+* SBCL: 1.0.58
+
+It should be straightforward to port *Iliad* to other Lisp
+implementations or operating systems.
+
 The Workflow for the *Poem* Project
 -----------------------------------
 

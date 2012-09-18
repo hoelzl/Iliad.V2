@@ -9,6 +9,8 @@
   :depends-on (#:alexandria
 	       #:fiveam
                #:iterate
+	       #-(or ecl abcl)
+	       #:closer-mop
 	       #:odysseus)
   :components ((:file "test-utilities")
 	       (:file "test-syntax")))

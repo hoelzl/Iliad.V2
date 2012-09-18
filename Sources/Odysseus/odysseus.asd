@@ -8,7 +8,9 @@
   :license "MIT, see file LICENSE"
   :depends-on (#:alexandria
 	       #:fiveam
-               #:iterate)
+               #:iterate
+	       #-(or ecl abcl)
+	       #:closer-mop)
   :components ((:file "packages")
 	       (:file "utilities")
 	       (:file "macros")

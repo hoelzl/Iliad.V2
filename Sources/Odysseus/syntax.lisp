@@ -113,6 +113,7 @@ primitive-action definition for OPERATOR in CONTEXT.")
      (defclass ,class-name (primitive-action-term)
        ())
      (defmethod operator ((term ,class-name))
+       (declare (ignore term))
        ',operator)
      (defmethod declare-primitive-action
        ((operator (eql ',operator)) context &optional (class-name ',class-name))
@@ -196,6 +197,7 @@ fluent definition for OPERATOR in CONTEXT.")
      (defclass ,class-name (known-general-application-term)
        ())
      (defmethod operator ((term ,class-name))
+       (declare (ignore term))
        ',operator)
      (defmethod declare-relational-fluent
        ((operator (eql ',operator)) context &optional (class-name ',class-name))
@@ -228,6 +230,7 @@ fluent definition for OPERATOR in CONTEXT.")
      (defclass ,class-name (known-general-application-term)
        ())
      (defmethod operator ((term ,class-name))
+       (declare (ignore term))
        ',operator)
      (defmethod declare-functional-fluent
        ((operator (eql ',operator)) context &optional (class-name ',class-name))
@@ -323,7 +326,7 @@ fluent definition for OPERATOR in CONTEXT.")
   ;; Simply ignore the intern keyword.  If we want to signal an error when
   ;; :INTERN is true and the term cannot be interned we have to very careful
   ;; with the class hierarchy which is probably not worth the effort.
-  (declare (ignore intern source))
+  (declare (ignore slot-names intern source))
   #+(or)
   (when intern
     (cerror "Create the instance without interning it."
@@ -334,6 +337,7 @@ fluent definition for OPERATOR in CONTEXT.")
     "The source form from which the term was derived, or NIL if no source is
     available")
   (:method (term)
+    (declare (ignore term))
     nil))
 
 (defclass source-mixin ()
@@ -351,6 +355,7 @@ fluent definition for OPERATOR in CONTEXT.")
   (:documentation
    "Returns true if TERM is specialized in the compiler.")
   (:method (term)
+    (declare (ignore term))
     nil)
   (:method ((term known-term))
     t))
@@ -426,7 +431,7 @@ structure."))
 (defclass functor-term (atomic-term required-name-mixin)
   ((arity
     :accessor arity :initarg :arity :initform (required-argument :arity)
-    :type (or null positive-fixnum)
+    :type (or null non-negative-fixnum)
     :documentation "The arity of the functor.  May be NIL if the arity is not
     known, but has to be set before the functor can be interned."))
   (:documentation
@@ -450,6 +455,7 @@ structure."))
   (:documentation
    "Returns true if TERM is a compound term.")
   (:method (term)
+    (declare (ignore term))
     nil)
   (:method ((term compound-term))
     t))
@@ -513,7 +519,7 @@ structure."))
 (defmethod shared-initialize :after ((self unary-term) slot-names
                                      &key arguments
                                           (argument nil argument-supplied-p))
-  (declare (ignore argument))
+  (declare (ignore slot-names argument))
   "Provide :ARGUMENTS as additional init-keyword.  Its argument must be a list
 of length 1, and it must not be provided when the :ARGUMENT init-keyword is
 also provided."
@@ -543,7 +549,7 @@ also provided."
                                      &key arguments
                                           (lhs nil lhs-supplied-p)
                                           (rhs nil rhs-supplied-p))
-  (declare (ignore lhs rhs))
+  (declare (ignore slot-names lhs rhs))
   "Provide :ARGUMENTS as additional init-keyword.  Its argument must be a list
 of length 2, and it must not be provided when either of the :LHS or :RHS
 init-keywords is also provided."
@@ -577,7 +583,7 @@ init-keywords is also provided."
                                           (arg1 nil arg1-supplied-p)
                                           (arg2 nil arg2-supplied-p)
                                           (arg3 nil arg3-supplied-p))
-  (declare (ignore arg1 arg2 arg3))
+  (declare (ignore slot-names arg1 arg2 arg3))
   "Provide :ARGUMENTS as additional init-keyword.  Its argument must be a list
 of length 3, and it must not be provided when either of the :ARG1, :ARG2
 or :ARG3 init-keywords is also provided."
@@ -767,6 +773,7 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "Returns true if TERM is final.")
   (:method (term)
+    (declare (ignore term))
     nil)
   (:method ((term empty-program-term))
     t))
@@ -1124,5 +1131,10 @@ or :ARG3 init-keywords is also provided."
   (mapcar (lambda (class)
             (cons class 
                   (ignore-errors
-                   (sb-mop:class-precedence-list (find-class class)))))
+                   #-(or ecl abcl)
+                   (c2mop:class-precedence-list (find-class class))
+                   #+ecl
+                   (clos:class-precedence-list (find-class class))
+                   #+abcl
+                   (mop:class-precedence-list (find-class class)))))
           (default-known-classes)))

@@ -1,6 +1,8 @@
 *~
 .#*
 *#
+*.dx64fsl
+*.fas
 *.fasl
 Readme.tex
 Readme.pdf

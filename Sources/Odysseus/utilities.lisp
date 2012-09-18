@@ -15,10 +15,6 @@
     #-sbcl defvar
     ,name ,value ,@(if doc (list doc) ())))
 
-#-sbcl
-(deftype positive-fixnum ()
-  '(and (integer 0) fixnum))
-
 (defmacro gethash* (key hash-table default-value)
   (once-only (key hash-table)
     `(multiple-value-bind (value key-present-p)
