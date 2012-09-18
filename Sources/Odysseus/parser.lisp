@@ -5,8 +5,8 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-syntax)
-(5am:in-suite odysseus-syntax-suite)
+(in-package #:odysseus-parser)
+(5am:in-suite odysseus-parser-suite)
 
 (defun starts-with-question-mark-p (symbol)
   "Returns true if SYMBOL is a symbol of length > 1 that starts with a
@@ -82,6 +82,9 @@ argument list."
 
 (defmethod parse-into-term-representation ((exp number) (context compilation-context))
   (make-instance 'number-term :value exp :context context))
+
+(defmethod parse-into-term-representation ((exp string) (context compilation-context))
+  (make-instance 'primitive-term :value exp :context context))
 
 (defmethod parse-into-term-representation ((exp cons) (context compilation-context))
   (let* ((operator (first exp))

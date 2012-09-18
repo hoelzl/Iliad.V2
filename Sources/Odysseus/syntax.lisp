@@ -1047,6 +1047,12 @@ or :ARG3 init-keywords is also provided."
 (defun default-known-operators ()
   (plist-hash-table *default-known-operators*))
 
+(defvar *default-primitive-action-names*
+  '(no-operation))
+
+(defun default-primitive-action-names ()
+  *default-primitive-action-names*)
+
 (defclass compilation-unit (compilation-context unique-terms-mixin)
   ((known-operators
     :accessor known-operators :initarg :known-operators
@@ -1077,7 +1083,8 @@ or :ARG3 init-keywords is also provided."
 
 (defmethod shared-initialize :after ((self compilation-unit) slot-names &key)
   (declare (ignore slot-names))
-  (declare-primitive-action 'no-operation self))
+  (dolist (action (default-primitive-action-names))
+    (declare-primitive-action action self)))
 
 (defmethod lookup-variable (name (context compilation-unit) &optional (create? t))
   (let ((hash-table (slot-value context 'variable-hash-table)))

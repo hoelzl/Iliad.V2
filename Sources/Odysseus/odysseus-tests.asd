@@ -13,4 +13,7 @@
 	       #:closer-mop
 	       #:odysseus)
   :components ((:file "test-utilities")
-	       (:file "test-syntax")))
+	       (:file "test-syntax")
+	       (:file "test-situation")
+	       (:file "test-parser")
+	       (:file "test-interpreter")))

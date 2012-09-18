@@ -140,43 +140,56 @@ raises an error otherwise.")
 ;;; Single-Step Interpretation
 ;;; ==========================
 
-(defgeneric interpret-1 (interpreter term)
+(defgeneric interpret-1 (interpreter term situation)
   (:documentation
-   "Interpret a single execution step of TERM using INTERPRETER.
+   "Interpret a single execution step of TERM using INTERPRETER in SITUATION.
 Returns the action performed by the term (an indirect instance of the class
-PRIMITIVE-ACTION-TERM).  If no action was performed by this evaluation
-step, an instance of NO-ACTION-TERM is returned."))
+PRIMITIVE-ACTION-TERM), the residual term that results from the evaluation
+step, and the situation after executing the primitive action.  If no action
+was performed by this evaluation step, an instance of NO-OPERATION-TERM is
+returned as first argument."))
 
-(defmethod interpret-1 ((interpreter basic-interpreter) (term list))
+(defmethod interpret-1
+    ((interpreter basic-interpreter) (term list) situation)
   (interpret-1 interpreter
-               (parse-into-term-representation term (context interpreter))))
+               (parse-into-term-representation term (context interpreter))
+               situation))
 
-(defmethod interpret-1 ((interpreter basic-interpreter) (term empty-program-term))
-  (declare (ignore interpreter))
-  (values :no-action term))
+(defmethod interpret-1
+    ((interpreter basic-interpreter) (term empty-program-term) situation)
+  (values (the-no-operation-term interpreter)
+          term ;; FIXME: This should be an error term.
+          situation))
 
-(defmethod interpret-1 ((interpreter basic-interpreter) (term primitive-action-term))
+(defmethod interpret-1
+    ((interpreter basic-interpreter) (term primitive-action-term) situation)
   (values term
-          (the-empty-program-term interpreter)))
+          (the-empty-program-term interpreter)
+          (make-instance 'successor-situation
+                         :action term
+                         :previous-situation situation)))
 
-(defmethod interpret-1 ((interpreter basic-interpreter) (term sequence-term))
+(defmethod interpret-1
+    ((interpreter basic-interpreter) (term sequence-term) situation)
   (let ((body (body term)))
     (cond ((null body)
-	   (interpret-1 interpreter (the-empty-program-term interpreter)))
+	   (interpret-1 interpreter (the-empty-program-term interpreter) situation))
 	  ((null (rest body))
-	   (interpret-1 interpreter (first body)))
+	   (interpret-1 interpreter (first body) situation))
 	  (t
-	   (multiple-value-bind (action rest-term)
-	       (interpret-1 interpreter (first body))
+	   (multiple-value-bind (action rest-term new-situation)
+	       (interpret-1 interpreter (first body) situation)
 	     (if (is-final-term-p rest-term)
 		 (values action
                          (make-instance 'sequence-term
 					:context (context term)
-					:body (rest body)))
+					:body (rest body))
+                         new-situation)
 		 (values action
                          (make-instance 'sequence-term
 					:context (context term)
-					:body (cons rest-term (rest body))))))))))
+					:body (cons rest-term (rest body)))
+                         new-situation)))))))
 
 ;;; Interpretation
 ;;; ==============
@@ -190,13 +203,15 @@ step, an instance of NO-ACTION-TERM is returned."))
   t)
 
 (defun interpret-and-print (term &key (interpreter (default-interpreter))
+                                      (situation (make-instance 'initial-situation))
                                       (test 'skip-noops))
-  (multiple-value-bind (action rest-term)
-      (interpret-1 interpreter term)
+  (multiple-value-bind (action rest-term new-situation)
+      (interpret-1 interpreter term situation)
     (when (funcall test action)
       (print (to-sexpr action)))
     (if (is-final-term-p rest-term)
-        :done
+        (to-sexpr new-situation)
         (interpret-and-print rest-term
                              :interpreter interpreter
+                             :situation new-situation
                              :test test))))

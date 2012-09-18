@@ -20,11 +20,17 @@
         #:odysseus-utilities-suite
         #:odysseus-macro-suite
         #:odysseus-syntax-suite
+        #:odysseus-situation-suite
+        #:odysseus-parser-suite
+        #:odysseus-interpreter-suite
         #:odysseus-compiler-suite
         #:odysseus-builtins-suite))
 
   (defglobal *odysseus-syntax-exports*
-      '(#:primitive-action-definition #:context
+      '(;; Forward declaration
+        #:parse-into-term-representation
+
+        #:primitive-action-definition #:context
         #:action-class #:action-precondition
         #:declare-primitive-action #:define-primitive-action
         #:fluent-definition
@@ -40,6 +46,8 @@
         #:compilation-context
         #:lookup-functor #:lookup-variable #:lookup-number
         #:known-operators #:default-known-operators
+        #:primitive-actions #:default-primitive-action-names
+        #:fluents
         #:the-empty-program-term #:the-no-operation-term
         #:context-mixin #:context
         #:unique-terms-mixin
@@ -47,7 +55,8 @@
         #:local-context #:outer-context #:local-variables
         
         #:term #:source #:to-sexpr
-        #:variable-term #:unique-name #:make-variable-term 
+        #:variable-term #:unique-name #:is-bound-p
+        #:make-variable-term 
         #:atomic-term
         #:primitive-term #:value
         #:functor-term
@@ -97,12 +106,6 @@
         #:procedure-definition-term
         #:domain-definition-term
         
-        ;; Parser
-        #:starts-with-question-mark-p
-        #:parse-arguments-for-term
-        #:parse-into-term-representation
-        #:parse-binding
-        
         ;; Operators
         "&" "," ";" "~" "->" "=>" "<-" "<=" "<->" "<=>"
         #:and #:or #:not #:implies
@@ -127,6 +130,18 @@
         #:procedure #:proc
         #:define-domain #:defdomain))
 
+  (defglobal *odysseus-situation-exports*
+      '(#:situation
+        #:initial-situation #:s0
+        #:successor-situation
+        #:next-situation))
+
+  (defglobal *odysseus-parser-exports*
+      '(#:starts-with-question-mark-p
+        #:parse-arguments-for-term
+        #:parse-binding
+        #:parse-into-term-representation))
+
   (defglobal *odysseus-interpreter-exports*
       '(#:interpreter
         #:default-interpreter
@@ -150,9 +165,27 @@
   (:nicknames #:syntax)
   (:export . #.*odysseus-syntax-exports*))
 
+(defpackage #:odysseus-situation
+  (:use #:common-lisp #:alexandria #:iterate
+	#:odysseus-utilities
+        #:odysseus-syntax)
+  (:nicknames #:situation)
+  (:export . #.*odysseus-situation-exports*))
+
+(defpackage #:odysseus-parser
+  (:use #:common-lisp #:alexandria #:iterate
+	#:odysseus-utilities
+        #:odysseus-syntax
+        #:odysseus-situation)
+  (:nicknames #:parser)
+  (:export . #.*odysseus-parser-exports*))
+
 (defpackage #:odysseus-interpreter
   (:use #:common-lisp #:alexandria #:iterate
-	#:odysseus-utilities #:odysseus-syntax)
+	#:odysseus-utilities
+        #:odysseus-syntax
+        #:odysseus-situation
+        #:odysseus-parser)
   (:nicknames #:interpreter #:interp)
   (:export . #.*odysseus-interpreter-exports*))
 
@@ -160,9 +193,13 @@
   (:use #:common-lisp #:alexandria #:iterate
 	#:odysseus-utilities
         #:odysseus-syntax
+        #:odysseus-situation
+        #:odysseus-parser
         #:odysseus-interpreter)
   (:export . #.*odysseus-utilities-exports*)
   (:export . #.*odysseus-syntax-exports*)
+  (:export . #.*odysseus-situation-exports*)
+  (:export . #.*odysseus-parser-exports*)
   (:export . #.*odysseus-interpreter-exports*))
 
 (defpackage #:odysseus-user

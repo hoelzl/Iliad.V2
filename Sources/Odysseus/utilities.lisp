@@ -58,6 +58,7 @@
 ;;; Testing
 ;;; =======
 
+
 #+5am
 (5am:def-suite odysseus-suite
   :description "The suite containing all tests for Odysseus.")
@@ -76,6 +77,21 @@
 (5am:def-suite odysseus-syntax-suite
   :in odysseus-suite
   :description "Tests for the syntax representation.")
+
+#+5am
+(5am:def-suite odysseus-situation-suite
+  :in odysseus-suite
+  :description "Tests for the situations.")
+
+#+5am
+(5am:def-suite odysseus-parser-suite
+  :in odysseus-suite
+  :description "Tests for the parser.")
+
+#+5am
+(5am:def-suite odysseus-interpreter-suite
+  :in odysseus-suite
+  :description "Tests for the interpreter.")
 
 #+5am
 (5am:def-suite odysseus-compiler-suite

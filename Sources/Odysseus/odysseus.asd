@@ -15,5 +15,6 @@
 	       (:file "utilities")
 	       (:file "macros")
 	       (:file "syntax")
+	       (:file "situation")
 	       (:file "parser")
 	       (:file "interpreter")))
