@@ -40,10 +40,13 @@
         #:compilation-context
         #:lookup-functor #:lookup-variable #:lookup-number
         #:known-operators #:default-known-operators
+        #:the-empty-program-term #:the-no-operation-term
+        #:context-mixin #:context
+        #:unique-terms-mixin
         #:compilation-unit
         #:local-context #:outer-context #:local-variables
         
-        #:term #:source
+        #:term #:source #:to-sexpr
         #:variable-term #:unique-name #:make-variable-term 
         #:atomic-term
         #:primitive-term #:value
@@ -76,6 +79,7 @@
         #:empty-program-term
         #:is-final-term-p
         #:primitive-action-term
+        #:no-operation-term #:no-operation
         #:test-term
         #:sequence-term
         #:action-choice-term
@@ -124,8 +128,15 @@
         #:define-domain #:defdomain))
 
   (defglobal *odysseus-interpreter-exports*
-      '(#:interpreter-state #:*default-interpreter-state*
-        #:interpret #:interpret-and-print))
+      '(#:interpreter
+        #:default-interpreter
+        #:reset-interpreter 
+        #:state-map #:can-set-state-p #:state
+        #:basic-interpreter-state
+        #:basic-interpreter
+        #:interpret-1
+        #:skip-noops #:print-everything
+        #:interpret-and-print))
 ) ; eval-when
       
 (defpackage #:odysseus-utilities

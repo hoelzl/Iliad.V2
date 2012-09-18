@@ -21,30 +21,70 @@
   (:documentation
    "Parse EXPRESSION into term representation in COMPILATION-CONTEXT."))
 
-;;; Operators
-;;; =========
+;;; Compilation Context
+;;; ===================
 
-(defgeneric operator (compound-term)
-  (:documentation "The operator of COMPOUND-TERM."))
+;;; A compilation context encapsulates the information needed by the
+;;; compiler.
 
-(defclass operator-mixin ()
-  ((operator :accessor operator :initarg :operator
-             :initform (required-argument :operator)))
-  (:documentation "Mixin that provides an OPERATOR slot."))
+(defclass compilation-context ()
+  ()
+  (:documentation
+   "Context needed by the compiler."))
 
-(defgeneric context (thing)
-  (:documentation "The compilation context in which THING is relevant."))
+(defgeneric lookup-functor (name arity context &optional create?)
+  (:documentation
+   "Return the functor with NAME and ARITY for the given CONTEXT if it
+   exists. Otherwise, if CREATE? is true, create and return a fresh
+   functor, if CREATE? is false return NIL."))
 
-(defclass context-mixin ()
-  ((context
-    :accessor context :initarg :context 
-    :initform (required-argument :context)
-    :documentation "The context to which this object belongs."))
-  (:documentation "Mixin that provides a CONTEXT slot."))
-   
+(defgeneric (setf lookup-functor) (new-value name arity context)
+  (:documentation
+   "Assign NEW-VALUE as the new value of LOOKUP-FUNCTOR for NAME and ARITY."))
 
-;;; Primitive Actions
-;;; =================
+(defgeneric lookup-variable (name context &optional create?)
+  (:documentation
+   "Return the variable NAME for the given CONTEXT if it
+   exists. Otherwise, if CREATE? is true, create and return a fresh
+   variable, if CREATE? is false return NIL."))
+
+(defgeneric (setf lookup-variable) (new-value name context)
+  (:documentation
+   "Assign NEW-VALUE as the new value of LOOKUP-VARIABLE for NAME."))
+
+(defgeneric lookup-number (value context &optional create?)
+  (:documentation
+   "Return a number constant with value VALUE for the given CONTEXT if it
+   exists. Otherwise, if CREATE? is true, create and return a fresh number
+   constant, if CREATE? is false return NIL."))
+
+(defgeneric (setf lookup-number) (new-number value context)
+  (:documentation
+   "Assign NEW-VALUE as the new value of LOOKUP-NUMBER for VALUE."))
+
+(defgeneric known-operators (context)
+  (:documentation
+   "A hash table containing a hash table that maps known operators into their
+   term type (represeted as symbol)."))
+
+;;; TODO: Do we need this?  Should we have it?  What should its sematics be
+;;; with regards to lexical/dynamic scoping?
+(defgeneric (setf known-operators) (new-value context))
+
+(defgeneric the-empty-program-term (context)
+  (:documentation
+   "Returns an instance of EMPTY-PROGRAM-TERM for CONTEXT that might be interned.")
+  (:method ((context compilation-context))
+    (make-instance 'empty-program-term :context context)))
+
+(defgeneric the-no-operation-term (context)
+  (:documentation
+   "Returns an instance of NO-OPERATION-TERM for CONTEXT that might be interned.")
+  (:method ((context compilation-context))
+    (make-instance 'no-operation-term :context context)))   
+
+;;; Methods for Obtaining Primitive Actions
+;;; ---------------------------------------
 
 ;;; The definition of a primitive action is provided by instances of
 ;;; PRIMITIVE-ACTION-DEFINITION.
@@ -100,7 +140,7 @@ NEW-VALUE.")
   (:documentation
    "Create a new instance of PRIMITIVE-ACTION-DEFINITION and assign it as
 primitive-action definition for OPERATOR in CONTEXT.")
-  (:method ((operator symbol) context
+  (:method ((operator symbol) (context compilation-context)
             &optional (class-name (symbolicate operator '#:-term)))
     (setf (primitive-action-definition operator context)
           (make-instance 'primitive-action-definition
@@ -116,7 +156,8 @@ primitive-action definition for OPERATOR in CONTEXT.")
        (declare (ignore term))
        ',operator)
      (defmethod declare-primitive-action
-       ((operator (eql ',operator)) context &optional (class-name ',class-name))
+       ((operator (eql ',operator)) (context compilation-context)
+        &optional (class-name ',class-name))
        (setf (primitive-action-definition operator context)
              (make-instance 'primitive-action-definition
                             :operator ',operator
@@ -125,10 +166,35 @@ primitive-action definition for OPERATOR in CONTEXT.")
                             :context context)))))
 
 
+
+;;; Operator and Context Mixins
+;;; ===========================
+
+(defgeneric operator (compound-term)
+  (:documentation "The operator of COMPOUND-TERM."))
+
+(defclass operator-mixin ()
+  ((operator :accessor operator :initarg :operator
+             :initform (required-argument :operator)))
+  (:documentation "Mixin that provides an OPERATOR slot."))
+
+(defgeneric context (thing)
+  (:documentation "The compilation context in which THING is relevant."))
+
+(defclass context-mixin ()
+  ((context
+    :accessor context :initarg :context 
+    ; :initform (required-argument :context)
+    :documentation "The context to which this object belongs."))
+  (:default-initargs :context (required-argument :context))
+  (:documentation "Mixin that provides a CONTEXT slot."))
+
+
 ;;; Fluent Definitions
 ;;; ==================
 
-;;; The definition of fluents is provided by (indirect) instances of FLUENT-DEFINITION.
+;;; The definition of fluents is provided by (indirect) instances of
+;;; FLUENT-DEFINITION.
 
 (defgeneric fluents (context)
   (:documentation
@@ -184,7 +250,7 @@ primitive-action definition for OPERATOR in CONTEXT.")
   (:documentation
    "Create a new instance of RELATIONAL-FLUENT-DEFINITION and assign it as
 fluent definition for OPERATOR in CONTEXT.")
-  (:method ((operator symbol) context
+  (:method ((operator symbol) (context compilation-context)
             &optional (class-name (symbolicate operator '#:-term)))
     (setf (fluent-definition operator context)
           (make-instance 'relational-fluent-definition
@@ -200,7 +266,8 @@ fluent definition for OPERATOR in CONTEXT.")
        (declare (ignore term))
        ',operator)
      (defmethod declare-relational-fluent
-       ((operator (eql ',operator)) context &optional (class-name ',class-name))
+       ((operator (eql ',operator)) (context compilation-context)
+        &optional (class-name ',class-name))
        (setf (fluent-definition operator context)
              (make-instance 'relational-fluent-definition
                             :operator ',operator
@@ -217,7 +284,7 @@ fluent definition for OPERATOR in CONTEXT.")
   (:documentation
    "Create a new instance of FUNCTIONAL-FLUENT-DEFINITION and assign it as
 fluent definition for OPERATOR in CONTEXT.")
-  (:method ((operator symbol) context
+  (:method ((operator symbol) (context compilation-context)
             &optional (class-name (symbolicate operator '#:-term)))
     (setf (fluent-definition operator context)
           (make-instance 'functional-fluent-definition
@@ -233,7 +300,8 @@ fluent definition for OPERATOR in CONTEXT.")
        (declare (ignore term))
        ',operator)
      (defmethod declare-functional-fluent
-       ((operator (eql ',operator)) context &optional (class-name ',class-name))
+       ((operator (eql ',operator)) (context compilation-context)
+        &optional (class-name ',class-name))
        (setf (fluent-definition operator context)
              (make-instance 'functional-fluent-definition
                             :operator ',operator
@@ -259,60 +327,11 @@ fluent definition for OPERATOR in CONTEXT.")
    "Mixin inherited by all classes that require a name."))
 
 
-;;; Compilation Context
-;;; ===================
-
-;;; A compilation context encapsulates the information needed by the
-;;; compiler.
-
-(defclass compilation-context ()
-  ()
-  (:documentation
-   "Context needed by the compiler."))
-
-(defgeneric lookup-functor (name arity context &optional create?)
-  (:documentation
-   "Return the functor with NAME and ARITY for the given CONTEXT if it
-   exists. Otherwise, if CREATE? is true, create and return a fresh
-   functor, if CREATE? is false return NIL."))
-
-(defgeneric (setf lookup-functor) (new-value name arity context)
-  (:documentation
-   "Assign NEW-VALUE as the new value of LOOKUP-FUNCTOR for NAME and ARITY."))
-
-(defgeneric lookup-variable (name context &optional create?)
-  (:documentation
-   "Return the variable NAME for the given CONTEXT if it
-   exists. Otherwise, if CREATE? is true, create and return a fresh
-   variable, if CREATE? is false return NIL."))
-
-(defgeneric (setf lookup-variable) (new-value name context)
-  (:documentation
-   "Assign NEW-VALUE as the new value of LOOKUP-VARIABLE for NAME."))
-
-(defgeneric lookup-number (value context &optional create?)
-  (:documentation
-   "Return a number constant with value VALUE for the given CONTEXT if it
-   exists. Otherwise, if CREATE? is true, create and return a fresh number
-   constant, if CREATE? is false return NIL."))
-
-(defgeneric (setf lookup-number) (new-number value context)
-  (:documentation
-   "Assign NEW-VALUE as the new value of LOOKUP-NUMBER for VALUE."))
-
-(defgeneric known-operators (context)
-  (:documentation
-   "A hash table containing a hash table that maps known operators into their
-   term type (represeted as symbol)."))
-
-;;; TODO: Do we need this?  Should we have it?  What should its sematics be
-;;; with regards to lexical/dynamic scoping?
-(defgeneric (setf known-operators) (new-value context))
-
 ;;; Terms
 ;;; =====
 
-;;; We define an ambivalent syntax, similar to Prolog.  
+;;; The class term is the superclass of all terms appearing in a parsed
+;;; program representation.
 
 (defclass term (context-mixin)
   ()
@@ -340,6 +359,10 @@ fluent definition for OPERATOR in CONTEXT.")
     (declare (ignore term))
     nil))
 
+(defgeneric to-sexpr (term)
+  (:documentation
+   "Convert TERM into an S-expression."))
+
 (defclass source-mixin ()
   ((source :reader source :initarg :source :initform nil))
   (:documentation
@@ -359,7 +382,6 @@ fluent definition for OPERATOR in CONTEXT.")
     nil)
   (:method ((term known-term))
     t))
-
 
 (defclass variable-term (term name-mixin source-mixin)
   ((unique-name
@@ -387,6 +409,9 @@ fluent definition for OPERATOR in CONTEXT.")
   (print-unreadable-object (term stream :type t :identity t)
     (format stream "~A" (name term))))
 
+(defmethod to-sexpr ((term variable-term))
+  (unique-name term))
+
 (defun make-variable-term (name context &key (intern t) (is-bound-p nil))
   (assert (typep name 'symbol) (name)
           "~A cannot denote a variable (it is not a symbol)." name)
@@ -413,6 +438,8 @@ structure."))
 (defmethod source ((term number-term))
   (value term))
 
+(defmethod to-sexpr ((term number-term))
+  (value term))
 
 ;;; TODO: we need a better name for this...
 ;;; TODO: should primitives be interned?
@@ -424,6 +451,9 @@ structure."))
    "Representation of primitives, i.e., non-numeric constants."))
 
 (defmethod source ((term primitive-term))
+  (value term))
+
+(defmethod to-sexpr ((term primitive-term))
   (value term))
 
 ;;; TODO: maybe functor should not inherit from term?  Then we need to
@@ -441,6 +471,9 @@ structure."))
 
 (defmethod source ((term functor-term))
   (name term))
+
+(defmethod to-sexpr ((term functor-term))
+  (symbolicate (name term) "/" (arity term)))
 
 ;;; Compound Terms
 ;;; --------------
@@ -483,6 +516,10 @@ structure."))
 (defmethod print-object ((term application-term) stream)
   (print-unreadable-object (term stream :type t :identity t)
     (format stream "~A" (source term))))
+
+(defmethod to-sexpr ((term application-term))
+  (list* (operator term)
+         (mapcar 'to-sexpr (arguments term))))
 
 (defclass arguments-mixin ()
   ((arguments :accessor arguments :initarg :arguments :initform '()
@@ -622,6 +659,10 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "Representation of terms that have a body."))
 
+(defmethod to-sexpr ((term body-term))
+  (list* (operator term)
+         (mapcar 'to-sexpr (body term))))
+
 (defclass binding ()
   ((binding-variable 
     :accessor binding-variable :initarg :variable
@@ -715,6 +756,11 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "Representation of all quantifications."))
 
+(defmethod to-sexpr ((term quantification-term))
+  (list (operator term)
+        (mapcar 'to-sexpr (bound-variables term))
+        (to-sexpr (argument term))))
+
 (defclass universal-quantification-term (quantification-term)
   ()
   (:documentation
@@ -778,10 +824,15 @@ or :ARG3 init-keywords is also provided."
   (:method ((term empty-program-term))
     t))
 
+(defmethod to-sexpr ((term empty-program-term))
+  'null)
+
 (defclass primitive-action-term (known-general-application-term)
   ((argument :accessor action :initarg :action))
   (:documentation
    "A term describing the execution of a primitive action."))
+
+(define-primitive-action no-operation)
 
 (defclass test-term (unary-term)
   ((argument :accessor test :initarg :test))
@@ -953,6 +1004,30 @@ or :ARG3 init-keywords is also provided."
     defdomain                   domain-definition-term))
 
 
+;;; Unique Terms Mixin
+;;; ==================
+
+;;; A mixin that provides storage for an empty program term and an
+;;; no-operation term.
+
+(defclass unique-terms-mixin ()
+  ((the-empty-program-term
+    :initform nil
+    :documentation "Storage for the empty program term.")
+   (the-no-operation-term
+    :initform nil
+    :documentation "Storage for the no-operation term.")))
+
+(defmethod the-empty-program-term ((self unique-terms-mixin))
+  (or (slot-value self 'the-empty-program-term)
+      (setf (slot-value self 'the-empty-program-term)
+            (make-instance 'empty-program-term :context self))))
+
+(defmethod the-no-operation-term ((self unique-terms-mixin))
+  (or (slot-value self 'the-no-operation-term)
+      (set (slot-value self 'the-no-operation-term)
+           (make-instance 'no-operation-term :context self))))
+
 ;;; Compilation units
 ;;; =================
 
@@ -972,7 +1047,7 @@ or :ARG3 init-keywords is also provided."
 (defun default-known-operators ()
   (plist-hash-table *default-known-operators*))
 
-(defclass compilation-unit (compilation-context)
+(defclass compilation-unit (compilation-context unique-terms-mixin)
   ((known-operators
     :accessor known-operators :initarg :known-operators
     :initform (default-known-operators)
@@ -999,6 +1074,10 @@ or :ARG3 init-keywords is also provided."
     :documentation "Hash table for interning functors"))
   (:documentation
    "A single compilation unit."))
+
+(defmethod shared-initialize :after ((self compilation-unit) slot-names &key)
+  (declare (ignore slot-names))
+  (declare-primitive-action 'no-operation self))
 
 (defmethod lookup-variable (name (context compilation-unit) &optional (create? t))
   (let ((hash-table (slot-value context 'variable-hash-table)))
@@ -1118,7 +1197,14 @@ or :ARG3 init-keywords is also provided."
 (defmethod (setf fluents) (new-value (context local-context))
   (setf (fluents (outer-context context)) new-value))
 
+(defmethod the-empty-program-term ((context local-context))
+  (the-empty-program-term (outer-context context)))
+
+(defmethod the-no-operation-term ((context local-context))
+  (the-no-operation-term (outer-context context)))
+
 ;;; Some utilities for interactive exploration
+;;; ==========================================
 
 (defun default-known-classes ()
   (let ((result '()))
