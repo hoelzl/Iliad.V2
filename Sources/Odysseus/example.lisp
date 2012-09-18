@@ -5,7 +5,7 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-syntax)
+(in-package #:odysseus-user)
 
 (define-primitive-action eat)
 (define-primitive-action sleep)
@@ -15,7 +15,10 @@
 (declare-primitive-action 'sleep *default-interpreter-state*)
 (declare-primitive-action 'celebrate *default-interpreter-state*)
 
-(interpret '(seq
-	     (eat something)
-	     (sleep several hours)
-	     (celebrate)))
+(defun run-example ()
+  (interpret-and-print 
+   '(seq
+     (eat something)
+     (sleep several hours)
+     (celebrate))))
+

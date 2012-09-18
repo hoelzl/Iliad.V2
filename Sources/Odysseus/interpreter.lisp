@@ -5,7 +5,7 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-syntax)
+(in-package #:odysseus-interpreter)
 
 (defclass interpreter-state (compilation-unit)
   ()
