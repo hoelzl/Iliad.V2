@@ -33,5 +33,7 @@
   `(do ,(to-sexpr (action situation))
        ,(to-sexpr (previous-situation situation))))
 
-
+(defgeneric in-situation (term situation)
+  (:documentation
+   "Replace the initial situation with SITUATION in TERM."))
 	

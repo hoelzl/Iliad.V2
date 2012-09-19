@@ -211,8 +211,8 @@
     (5am:is (= arity (length (arguments parsed-term))))
     (5am:is (typep (first (arguments parsed-term)) 'variable-term))))
 
-(define-primitive-action foo)
-(define-primitive-action bar)
+(define-primitive-action foo '(t t))
+(define-primitive-action bar '(t))
 
 (5am:test (test-parse-into-term-representation-04
            :compile-at :definition-time)

@@ -123,6 +123,8 @@
         #:concurrently #:in-parallel
         #:prioritized #:when-blocked
         #:spawn #:new-process
+
+        #:poss
         
         #:define-primitive-action #:defaction #:defprimitive
         #:primitive-action #:primact
@@ -134,7 +136,8 @@
       '(#:situation
         #:initial-situation #:s0
         #:successor-situation
-        #:next-situation))
+        #:next-situation
+        #:in-situation))
 
   (defglobal *odysseus-parser-exports*
       '(#:starts-with-question-mark-p
@@ -142,10 +145,18 @@
         #:parse-binding
         #:parse-into-term-representation))
 
+  (defglobal *odysseus-snark-exports*
+      '(#:initialize-snark
+        #:set-up-theory
+        #:*print-snark-output*
+        #:prove-using-snark))
+
   (defglobal *odysseus-interpreter-exports*
       '(#:interpreter
         #:default-interpreter
-        #:reset-interpreter 
+        #:reset-interpreter
+        #:can-execute-p
+        #:make-choice-point #:next-choice-point #:backtrack
         #:state-map #:can-set-state-p #:state
         #:basic-interpreter-state
         #:basic-interpreter
@@ -157,7 +168,11 @@
 (defpackage #:odysseus-utilities
   (:use #:common-lisp #:alexandria #:iterate)
   (:nicknames #:utils)
-  (:export . #.*odysseus-utilities-exports*))
+  (:export . #.*odysseus-utilities-exports*)
+  ;; To temporarily fix the package problems for Snark evaluation.
+  (:export #:do #:no-operation
+           #:eat #:sleep #:work #:celebrate #:is-rested-p
+           #:annabelle #:lenz #:matthias))
 
 (defpackage #:odysseus-syntax
   (:use #:common-lisp #:alexandria #:iterate
@@ -180,12 +195,18 @@
   (:nicknames #:parser)
   (:export . #.*odysseus-parser-exports*))
 
+(defpackage #:odysseus-snark
+  (:use #:common-lisp #:snark #:odysseus-utilities)
+  (:nicknames)
+  (:export . #.*odysseus-snark-exports*))
+
 (defpackage #:odysseus-interpreter
   (:use #:common-lisp #:alexandria #:iterate
 	#:odysseus-utilities
         #:odysseus-syntax
         #:odysseus-situation
-        #:odysseus-parser)
+        #:odysseus-parser
+        #:odysseus-snark)
   (:nicknames #:interpreter #:interp)
   (:export . #.*odysseus-interpreter-exports*))
 
@@ -200,11 +221,14 @@
   (:export . #.*odysseus-syntax-exports*)
   (:export . #.*odysseus-situation-exports*)
   (:export . #.*odysseus-parser-exports*)
+  (:export . #.*odysseus-snark-exports*)
   (:export . #.*odysseus-interpreter-exports*))
 
 (defpackage #:odysseus-user
   (:use #:common-lisp #:alexandria #:iterate
         #:common-lisp-user
+        ;; To fix problems with symbols when calling Snark.
+        #:odysseus-utilities
         #:odysseus))
 
 (defpackage #:odysseus-tests

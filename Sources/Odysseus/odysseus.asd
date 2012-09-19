@@ -7,14 +7,15 @@
   :author "Matthias Hoelzl <tc@xantira.com>"
   :license "MIT, see file LICENSE"
   :depends-on (#:alexandria
+	       #-(or ecl abcl) #:closer-mop
 	       #:fiveam
                #:iterate
-	       #-(or ecl abcl)
-	       #:closer-mop)
+	       #:snark)
   :components ((:file "packages")
 	       (:file "utilities")
 	       (:file "macros")
 	       (:file "syntax")
 	       (:file "situation")
 	       (:file "parser")
+	       (:file "snark")
 	       (:file "interpreter")))

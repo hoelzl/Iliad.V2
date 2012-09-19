@@ -100,9 +100,8 @@
 (defgeneric primitive-action-definition (action-name context &optional default)
   (:documentation 
    "Returns the definition of the primitive action ACTION-NAME in CONTEXT.")
-  (:method ((action-name symbol) context &optional (default nil))
-    (assert context (context)
-            "Cannot look up primitive-action symbol without context.")
+  (:method ((action-name symbol) (context compilation-context)
+            &optional (default nil))
     (gethash action-name (primitive-actions context) default)))
 
 (defgeneric (setf primitive-action-definition) (new-value action-name context)
@@ -120,7 +119,11 @@ NEW-VALUE.")
    (action-precondition
     :accessor action-precondition :initarg :precondition
     :initform nil
-    :documentation "The precondition for this action."))
+    :documentation "The precondition for this action.")
+   (action-signature
+    :accessor action-signature :initarg :signature
+    :initform (required-argument :signature)
+    :documentation "The signature of this action."))
   (:documentation
    "The definition of a primitive action."))
 
@@ -146,7 +149,7 @@ primitive-action definition for OPERATOR in CONTEXT.")
           (make-instance 'primitive-action-definition
                          :operator operator :class class-name :context context))))
 
-(defmacro define-primitive-action (operator
+(defmacro define-primitive-action (operator signature
                                    &key (class-name (symbolicate operator '#:-term))
                                         precondition)
   `(progn
@@ -161,8 +164,9 @@ primitive-action definition for OPERATOR in CONTEXT.")
        (setf (primitive-action-definition operator context)
              (make-instance 'primitive-action-definition
                             :operator ',operator
+                            :signature ,signature
                             :class class-name
-                            :precondition ',precondition
+                            :precondition ,precondition
                             :context context)))))
 
 
@@ -410,7 +414,7 @@ fluent definition for OPERATOR in CONTEXT.")
     (format stream "~A" (name term))))
 
 (defmethod to-sexpr ((term variable-term))
-  (unique-name term))
+  (name term))
 
 (defun make-variable-term (name context &key (intern t) (is-bound-p nil))
   (assert (typep name 'symbol) (name)
@@ -832,7 +836,7 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "A term describing the execution of a primitive action."))
 
-(define-primitive-action no-operation)
+(define-primitive-action no-operation '())
 
 (defclass test-term (unary-term)
   ((argument :accessor test :initarg :test))
