@@ -8,169 +8,6 @@
 (in-package #:odysseus-syntax)
 (5am:in-suite odysseus-syntax-suite)
 
-;;; Forward Declarations from the Parser
-;;; ====================================
-
-;;; The following declaration is introduced here to avoid compiler warnings.
-;;; It logically belongs into the file parser.lisp.
-
-;;; TODO: Maybe this is a sign that we should put all definitions of generic
-;;; functions into a file that is processed early in the compilation process?
-
-(defgeneric parse-into-term-representation (expression compilation-context)
-  (:documentation
-   "Parse EXPRESSION into term representation in COMPILATION-CONTEXT."))
-
-;;; Compilation Context
-;;; ===================
-
-;;; A compilation context encapsulates the information needed by the
-;;; compiler.
-
-(defclass compilation-context ()
-  ()
-  (:documentation
-   "Context needed by the compiler."))
-
-(defgeneric lookup-functor (name arity context &optional create?)
-  (:documentation
-   "Return the functor with NAME and ARITY for the given CONTEXT if it
-   exists. Otherwise, if CREATE? is true, create and return a fresh
-   functor, if CREATE? is false return NIL."))
-
-(defgeneric (setf lookup-functor) (new-value name arity context)
-  (:documentation
-   "Assign NEW-VALUE as the new value of LOOKUP-FUNCTOR for NAME and ARITY."))
-
-(defgeneric lookup-variable (name context &optional create?)
-  (:documentation
-   "Return the variable NAME for the given CONTEXT if it
-   exists. Otherwise, if CREATE? is true, create and return a fresh
-   variable, if CREATE? is false return NIL."))
-
-(defgeneric (setf lookup-variable) (new-value name context)
-  (:documentation
-   "Assign NEW-VALUE as the new value of LOOKUP-VARIABLE for NAME."))
-
-(defgeneric lookup-number (value context &optional create?)
-  (:documentation
-   "Return a number constant with value VALUE for the given CONTEXT if it
-   exists. Otherwise, if CREATE? is true, create and return a fresh number
-   constant, if CREATE? is false return NIL."))
-
-(defgeneric (setf lookup-number) (new-number value context)
-  (:documentation
-   "Assign NEW-VALUE as the new value of LOOKUP-NUMBER for VALUE."))
-
-(defgeneric known-operators (context)
-  (:documentation
-   "A hash table containing a hash table that maps known operators into their
-   term type (represeted as symbol)."))
-
-;;; TODO: Do we need this?  Should we have it?  What should its sematics be
-;;; with regards to lexical/dynamic scoping?
-(defgeneric (setf known-operators) (new-value context))
-
-(defgeneric the-empty-program-term (context)
-  (:documentation
-   "Returns an instance of EMPTY-PROGRAM-TERM for CONTEXT that might be interned.")
-  (:method ((context compilation-context))
-    (make-instance 'empty-program-term :context context)))
-
-(defgeneric the-no-operation-term (context)
-  (:documentation
-   "Returns an instance of NO-OPERATION-TERM for CONTEXT that might be interned.")
-  (:method ((context compilation-context))
-    (make-instance 'no-operation-term :context context)))   
-
-;;; Methods for Obtaining Primitive Actions
-;;; ---------------------------------------
-
-;;; The definition of a primitive action is provided by instances of
-;;; PRIMITIVE-ACTION-DEFINITION.
-
-(defgeneric primitive-actions (context)
-  (:documentation
-   "A hash table containing the description of each primitive action known in
-   CONTEXT."))
-
-;;; TODO: See (setf known-operators).
-(defgeneric (setf primitive-actions) (new-value context))
-
-(defgeneric primitive-action-definition (action-name context &optional default)
-  (:documentation 
-   "Returns the definition of the primitive action ACTION-NAME in CONTEXT.")
-  (:method ((action-name symbol) (context compilation-context)
-            &optional (default nil))
-    (gethash action-name (primitive-actions context) default)))
-
-(defgeneric (setf primitive-action-definition) (new-value action-name context)
-  (:documentation
-   "Set the definition for primitive action ACTION-NAME in CONTEXT to
-NEW-VALUE.")
-  (:method (new-value (action-name symbol) context)
-    (setf (gethash action-name (primitive-actions context)) new-value)))
-
-(defclass primitive-action-definition (operator-mixin context-mixin)
-  ((action-class
-    :accessor action-class :initarg :class
-    :initform (required-argument :class)
-    :documentation "The class of this primitive action.")
-   (action-precondition
-    :accessor action-precondition :initarg :precondition
-    :initform nil
-    :documentation "The precondition for this action.")
-   (action-signature
-    :accessor action-signature :initarg :signature
-    :initform (required-argument :signature)
-    :documentation "The signature of this action."))
-  (:documentation
-   "The definition of a primitive action."))
-
-(defmethod shared-initialize :after ((self primitive-action-definition) slot-names
-                                     &key context operator action-precondition)
-  (assert context (context)
-          "Cannot create a primitive action definition without context.")
-  (assert (and operator (symbolp operator)) (operator)
-          "Cannot create a primitive action definition without operator.")
-  (setf (primitive-action-definition operator context) self)
-  (when (and action-precondition (consp action-precondition)
-             (or (eql slot-names t) (member 'action-precondition slot-names)))
-    (setf (slot-value self 'action-precondition)
-          (parse-into-term-representation action-precondition context))))
-
-(defgeneric declare-primitive-action (operator context &optional class-name)
-  (:documentation
-   "Create a new instance of PRIMITIVE-ACTION-DEFINITION and assign it as
-primitive-action definition for OPERATOR in CONTEXT.")
-  (:method ((operator symbol) (context compilation-context)
-            &optional (class-name (symbolicate operator '#:-term)))
-    (setf (primitive-action-definition operator context)
-          (make-instance 'primitive-action-definition
-                         :operator operator :class class-name :context context))))
-
-(defmacro define-primitive-action (operator signature
-                                   &key (class-name (symbolicate operator '#:-term))
-                                        precondition)
-  `(progn
-     (defclass ,class-name (primitive-action-term)
-       ())
-     (defmethod operator ((term ,class-name))
-       (declare (ignore term))
-       ',operator)
-     (defmethod declare-primitive-action
-       ((operator (eql ',operator)) (context compilation-context)
-        &optional (class-name ',class-name))
-       (setf (primitive-action-definition operator context)
-             (make-instance 'primitive-action-definition
-                            :operator ',operator
-                            :signature ,signature
-                            :class class-name
-                            :precondition ,precondition
-                            :context context)))))
-
-
-
 ;;; Operator and Context Mixins
 ;;; ===========================
 
@@ -233,15 +70,14 @@ primitive-action definition for OPERATOR in CONTEXT.")
   (:documentation "The definition of a fluent."))
 
 
-(defmethod shared-initialize :after ((self fluent-definition) slot-names
-                                     &key context operator fluent-successor-state)
+(defmethod initialize-instance :after
+    ((self fluent-definition) &key context operator fluent-successor-state)
   (assert context (context)
           "Cannot create a fluent definition without context.")
   (assert (and operator (symbolp operator)) (operator)
           "Cannot create a fluent definition without operator.")
   (setf (fluent-definition operator context) self)
-  (when (and fluent-successor-state (consp fluent-successor-state)
-             (or (eql slot-names t) (member 'fluent-successor-state slot-names)))
+  (when (and fluent-successor-state (consp fluent-successor-state))
     (setf (slot-value self 'fluent-successor-state)
           (parse-into-term-representation fluent-successor-state context))))
 
@@ -363,10 +199,6 @@ fluent definition for OPERATOR in CONTEXT.")
     (declare (ignore term))
     nil))
 
-(defgeneric to-sexpr (term)
-  (:documentation
-   "Convert TERM into an S-expression."))
-
 (defclass source-mixin ()
   ((source :reader source :initarg :source :initform nil))
   (:documentation
@@ -413,9 +245,6 @@ fluent definition for OPERATOR in CONTEXT.")
   (print-unreadable-object (term stream :type t :identity t)
     (format stream "~A" (name term))))
 
-(defmethod to-sexpr ((term variable-term))
-  (name term))
-
 (defun make-variable-term (name context &key (intern t) (is-bound-p nil))
   (assert (typep name 'symbol) (name)
           "~A cannot denote a variable (it is not a symbol)." name)
@@ -442,9 +271,6 @@ structure."))
 (defmethod source ((term number-term))
   (value term))
 
-(defmethod to-sexpr ((term number-term))
-  (value term))
-
 ;;; TODO: we need a better name for this...
 ;;; TODO: should primitives be interned?
 (defclass primitive-term (atomic-term)
@@ -455,9 +281,6 @@ structure."))
    "Representation of primitives, i.e., non-numeric constants."))
 
 (defmethod source ((term primitive-term))
-  (value term))
-
-(defmethod to-sexpr ((term primitive-term))
   (value term))
 
 ;;; TODO: maybe functor should not inherit from term?  Then we need to
@@ -475,9 +298,6 @@ structure."))
 
 (defmethod source ((term functor-term))
   (name term))
-
-(defmethod to-sexpr ((term functor-term))
-  (symbolicate (name term) "/" (arity term)))
 
 ;;; Compound Terms
 ;;; --------------
@@ -520,10 +340,6 @@ structure."))
 (defmethod print-object ((term application-term) stream)
   (print-unreadable-object (term stream :type t :identity t)
     (format stream "~A" (source term))))
-
-(defmethod to-sexpr ((term application-term))
-  (list* (operator term)
-         (mapcar 'to-sexpr (arguments term))))
 
 (defclass arguments-mixin ()
   ((arguments :accessor arguments :initarg :arguments :initform '()
@@ -663,10 +479,6 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "Representation of terms that have a body."))
 
-(defmethod to-sexpr ((term body-term))
-  (list* (operator term)
-         (mapcar 'to-sexpr (body term))))
-
 (defclass binding ()
   ((binding-variable 
     :accessor binding-variable :initarg :variable
@@ -760,11 +572,6 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "Representation of all quantifications."))
 
-(defmethod to-sexpr ((term quantification-term))
-  (list (operator term)
-        (mapcar 'to-sexpr (bound-variables term))
-        (to-sexpr (argument term))))
-
 (defclass universal-quantification-term (quantification-term)
   ()
   (:documentation
@@ -827,9 +634,6 @@ or :ARG3 init-keywords is also provided."
     nil)
   (:method ((term empty-program-term))
     t))
-
-(defmethod to-sexpr ((term empty-program-term))
-  'null)
 
 (defclass primitive-action-term (known-general-application-term)
   ((argument :accessor action :initarg :action))
@@ -1031,207 +835,3 @@ or :ARG3 init-keywords is also provided."
   (or (slot-value self 'the-no-operation-term)
       (set (slot-value self 'the-no-operation-term)
            (make-instance 'no-operation-term :context self))))
-
-;;; Compilation units
-;;; =================
-
-;;; A compilation unit is a long-lasting context.
-
-(defvar *default-known-operators*
-  (append *logical-operators* *programming-operators* *definition-operators*))
-
-#+(or)
-(unless *default-known-operators*
-  (setf *default-known-operators*
-        (append *logical-operators*
-                *programming-operators*
-                *definition-operators*)))
-
-
-(defun default-known-operators ()
-  (plist-hash-table *default-known-operators*))
-
-(defvar *default-primitive-action-names*
-  '(no-operation))
-
-(defun default-primitive-action-names ()
-  *default-primitive-action-names*)
-
-(defclass compilation-unit (compilation-context unique-terms-mixin)
-  ((known-operators
-    :accessor known-operators :initarg :known-operators
-    :initform (default-known-operators)
-    :documentation "Special operators for this compilation unit.")
-   (primitive-actions
-    :accessor primitive-actions :initarg :primitive-actions
-    :initform (make-hash-table)
-    :documentation "Hash table mapping each primitive action to its definition.")
-   (fluents
-    :accessor fluents :initarg :fluents
-    :initform (make-hash-table)
-    :documentation "Hash table mapping each fluent to its definition.")
-   (variable-hash-table
-    :accessor variable-hash-table :initarg :variable-hash-table
-    :initform (make-hash-table)
-    :documentation "Hash table for interning variables.")
-   (number-hash-table
-    :accessor number-hash-table :initarg :number-hash-table
-    :initform (make-hash-table)
-    :documentation "Hash table for interning numbers.")
-   (functor-hash-table
-    :accessor functor-hash-table :initarg :functor-hash-table
-    :initform (make-hash-table)
-    :documentation "Hash table for interning functors"))
-  (:documentation
-   "A single compilation unit."))
-
-(defmethod shared-initialize :after ((self compilation-unit) slot-names &key)
-  (declare (ignore slot-names))
-  (dolist (action (default-primitive-action-names))
-    (declare-primitive-action action self)))
-
-(defmethod lookup-variable (name (context compilation-unit) &optional (create? t))
-  (let ((hash-table (slot-value context 'variable-hash-table)))
-    (multiple-value-bind (variable exists?)
-	(gethash name hash-table nil)
-      (cond (exists? variable)
-	    (create?
-	     (setf (lookup-variable name context)
-		   (make-variable-term name context :intern nil)))
-	    (t nil)))))
-
-(defmethod (setf lookup-variable) (new-value name (context compilation-unit))
-  (check-type new-value variable-term)
-  (let ((hash-table (slot-value context 'variable-hash-table)))
-    (setf (gethash name hash-table) new-value)))
-
-(defmethod lookup-number (value (context compilation-unit) &optional (create? t))
-  (let* ((hash-table (slot-value context 'number-hash-table)))
-    (multiple-value-bind (number exists?)
-	(gethash value hash-table nil)
-      (cond (exists? number)
-	    (create?
-	     (setf (lookup-number value context)
-		   (make-instance
-		    'number-term :value value :intern nil :context context)))
-	    (t nil)))))
-
-(defmethod (setf lookup-number) (new-value value (context compilation-unit))
-  (check-type new-value number-term)
-  (assert (= (value new-value) value) (new-value)
-          "Trying to set number ~A to value ~A." value (value new-value))
-  (let* ((hash-table (slot-value context 'number-hash-table)))
-    (setf (gethash value hash-table) new-value)))
-
-
-(defmethod lookup-functor (name arity (context compilation-unit) &optional (create? t))
-  (let* ((hash-table-1 (slot-value context 'functor-hash-table))
-	 (hash-table-2 (gethash* name hash-table-1 (make-hash-table))))
-    (multiple-value-bind (functor exists?)
-	(gethash arity hash-table-2 nil)
-      (cond (exists? functor)
-	    (create?
-	     (setf (lookup-functor name arity context)
-		   (make-instance
-		    'functor-term :name name :arity arity
-				  :intern nil :context context)))
-	    (t nil)))))
-
-(defmethod (setf lookup-functor) (new-value name arity (context compilation-unit))
-  (check-type new-value functor-term)
-  (let* ((hash-table-1 (slot-value context 'functor-hash-table))
-	 (hash-table-2 (gethash* name hash-table-1 (make-hash-table))))
-    (setf (gethash arity hash-table-2) new-value)))
-
-
-;;; Local Context
-;;; =============
-
-(defclass local-context (compilation-context)
-  ((outer-context :accessor outer-context :initarg :outer-context
-                  :initform (required-argument :outer-context))
-   (local-variables :accessor local-variables :initarg :local-variables
-                    :initform '()))
-  (:documentation
-   "A temporary context for forms that bind variables."))
-
-(defmethod lookup-variable (name (context local-context) &optional (create? t))
-  (let ((local-binding (assoc name (local-variables context))))
-    (if local-binding
-        (cdr local-binding)
-        (let* ((outer-context (outer-context context))
-               (outer-var (lookup-variable name outer-context nil)))
-          (or outer-var
-              (if create?
-                  (let ((var (make-variable-term name context :intern nil)))
-                    (push (cons name var) (local-variables context))
-                    var)
-                  nil))))))
-
-(defmethod (setf lookup-variable) (new-value name (context local-context))
-  (let ((binding (assoc name (local-variables context))))
-    (cond (binding
-           (setf (cdr binding) new-value))
-          (t
-           (push (cons name new-value) (local-variables context))
-           new-value))))
-
-(defmethod lookup-number (value (context local-context) &optional (create? t))
-  (lookup-number value (outer-context context) create?))
-
-(defmethod (setf lookup-number) (new-value value (context local-context))
-  (assert (= (value new-value) value) (new-value)
-          "Trying to set number ~A to value ~A." value (value new-value))
-  (setf (lookup-number value (outer-context context)) new-value))
-
-(defmethod lookup-functor (name arity (context local-context) &optional (create? t))
-  (lookup-functor name arity (outer-context context) create?))
-
-(defmethod (setf lookup-functor) (new-value name arity (context local-context))
-  (setf (lookup-functor name arity (outer-context context)) new-value))
-
-(defmethod known-operators ((context local-context))
-  (known-operators (outer-context context)))
-
-(defmethod (setf known-operators) (new-value (context local-context))
-  (setf (known-operators (outer-context context)) new-value))
-
-(defmethod primitive-actions ((context local-context))
-  (primitive-actions (outer-context context)))
-
-(defmethod (setf primitive-actions) ((new-value list) (context local-context))
-  (setf (primitive-actions (outer-context context)) new-value))
-
-(defmethod fluents ((context local-context))
-  (fluents (outer-context context)))
-
-(defmethod (setf fluents) (new-value (context local-context))
-  (setf (fluents (outer-context context)) new-value))
-
-(defmethod the-empty-program-term ((context local-context))
-  (the-empty-program-term (outer-context context)))
-
-(defmethod the-no-operation-term ((context local-context))
-  (the-no-operation-term (outer-context context)))
-
-;;; Some utilities for interactive exploration
-;;; ==========================================
-
-(defun default-known-classes ()
-  (let ((result '()))
-    (doplist (op class *default-known-operators*)
-      (declare (ignorable op))
-      (pushnew class result))
-    result))
-
-(defun default-known-cpls ()
-  (mapcar (lambda (class)
-            (cons class 
-                  (ignore-errors
-                   #-(or ecl abcl)
-                   (c2mop:class-precedence-list (find-class class))
-                   #+ecl
-                   (clos:class-precedence-list (find-class class))
-                   #+abcl
-                   (mop:class-precedence-list (find-class class)))))
-          (default-known-classes)))

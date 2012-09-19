@@ -17,9 +17,9 @@
 ;;; The Class INTERPRETER
 ;;; ---------------------
 
-(defclass interpreter (context-mixin)
-  ()
-  (:default-initargs :context (make-instance 'compilation-unit))
+(defclass interpreter ()
+  ((context :accessor context :initarg :context
+            :initform (make-instance 'compilation-unit)))
   (:documentation
    "The base class of all interpreters."))
 
@@ -122,8 +122,19 @@ raises an error otherwise.")
   (declare-functional-fluent operator (context interpreter) class-name))
 
 
+;;; Tracing
+;;; -------
+
+(defvar *trace-odysseus* t)
+
+(defun trace-odysseus ()
+  (setf *trace-odysseus* t))
+
+(defun untrace-odysseus ()
+  (setf *trace-odysseus* nil))
+
 ;;; The Class BASIC-INTERPRETER
-;;; --------------------------- 
+;;; ---------------------------
               
 (defclass basic-interpreter-state (compilation-unit)
   ()
@@ -155,20 +166,21 @@ raises an error otherwise.")
   ((interpreter basic-interpreter) (term primitive-action-term) situation)
   (let ((action-def (primitive-action-definition (operator term) interpreter)))
     (if (not (action-precondition action-def))
-        t
-        (let ((proof-term `(poss ,(to-sexpr term) ,(to-sexpr situation))))
+        (values t :no-precondition '() '())
+        (let* ((proof-term `(poss ,(to-sexpr term) ,(to-sexpr situation)))
+               (free-variables (free-variables term))
+               (free-variable-sexprs (mapcar 'to-sexpr free-variables)))
           (multiple-value-bind (result reason answer)
               (prove-using-snark proof-term
-                                 ;; FIXME: need to extract answer variables from term
-                                 :answer '(answer ?p.person)
+                                 :answer `(answer ,@free-variable-sexprs)
                                  ;; FIXME: need to provide a correct theory
                                  :set-up-theory 'set-up-theory)
-            (declare (ignore answer))
-            (when  (and (eql reason :refutation-found) *print-snark-refutations*)
-              (format t "~&Refutation found for ~:W." proof-term))
-            (when  (and (eql reason :timeout) *print-snark-timeouts*)
-              (format t "~&Timeout when trying to prove ~:W." proof-term))
-            result)))))
+            (when *trace-odysseus*
+              (when  (and (eql reason :refutation-found) *print-snark-refutations*)
+                (format t "~&Refutation found for~25T~:W." proof-term))
+              (when  (and (eql reason :timeout) *print-snark-timeouts*)
+                (format t "~&Timeout while proving~25T~:W." proof-term)))
+            (values result reason free-variables answer))))))
 
 (defmethod make-choice-point
     ((interpreter basic-interpreter) term situation)
@@ -247,13 +259,32 @@ returned as first argument."))
 
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term primitive-action-term) situation)
-  (if (can-execute-p interpreter term situation)
-      (values term
-              (the-empty-program-term interpreter)
-              (make-instance 'successor-situation
-                             :action term
-                             :previous-situation situation))
-      (backtrack interpreter)))
+  (multiple-value-bind (can-execute-p reason free-variables answer)
+      (can-execute-p interpreter term situation)
+    (flet ((maybe-output-trace-information (action)
+             (when *trace-odysseus*
+               (if (or (eql reason :no-precondition)
+                       (null free-variables))
+                   (format t "~&~A~25T~:W:~%  Reason:~25T~A~%"
+                           action (to-sexpr term) reason)
+                   (format t "~&~A~25T~:W:~%  ~
+                           Reason:~25T~A~%  ~
+                           Free Variables:~25T~:W~%  Answer:~25T~:W~%"
+                           action
+                           (to-sexpr term)
+                           reason
+                           (mapcar 'to-sexpr free-variables)
+                           answer)))))
+      (cond (can-execute-p
+             (maybe-output-trace-information "Executing")
+             (values term
+                     (the-empty-program-term interpreter)
+                     (make-instance 'successor-situation
+                                    :action term
+                                    :previous-situation situation)))
+            (t
+             (maybe-output-trace-information "NOT Executing")
+             (backtrack interpreter))))))
 
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term sequence-term) situation)
@@ -291,14 +322,18 @@ returned as first argument."))
 
 (defun interpret-and-print (term &key (interpreter (default-interpreter))
                                       (situation (make-instance 'initial-situation))
-                                      (test 'skip-noops))
-  (multiple-value-bind (action rest-term new-situation)
-      (interpret-1 interpreter term situation)
-    (when (funcall test action)
-      (pprint (to-sexpr action)))
-    (if (is-final-term-p rest-term)
-        (to-sexpr new-situation)
-        (interpret-and-print rest-term
-                             :interpreter interpreter
-                             :situation new-situation
-                             :test test))))
+                                      (test 'skip-noops)
+                                      (error-value :execution-failed))
+  (labels ((recurse (term situation)
+             (multiple-value-bind (action rest-term new-situation)
+                 (interpret-1 interpreter term situation)
+               (when (funcall test action)
+                 (format t "~&*** Performing Action ~25T~:W ***~%" (to-sexpr action)))
+               (if (is-final-term-p rest-term)
+                   (to-sexpr new-situation)
+                   (recurse rest-term new-situation)))))
+    (handler-case
+        (recurse term situation)
+      (error ()
+        error-value))))
+      

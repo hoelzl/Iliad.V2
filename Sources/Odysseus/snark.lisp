@@ -26,7 +26,7 @@
   (print-options-when-starting nil)
   (print-summary-when-finished nil)
   (print-rows-when-derived nil)
-  (print-rows-when-finished nil)
+  (print-rows-when-finished t)
   (print-agenda-when-finished t)
   (run-time-limit 0.1)
   (use-conditional-answer-creation t)
@@ -74,7 +74,9 @@
 (defvar *print-snark-output* nil)
 
 (defun prove-using-snark (term &rest args &key set-up-theory answer)
-  (declare (ignore set-up-theory answer))
+  (declare (ignore set-up-theory))
+  (unless answer
+    (alexandria:remove-from-plistf args :answer))
   (flet ((do-prove ()
 	   (let ((result (apply 'ida-prove-or-refute term args)))
 	     (case result

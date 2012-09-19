@@ -11,10 +11,14 @@
 	       #:fiveam
                #:iterate
 	       #:snark)
-  :components ((:file "packages")
+  :components ((:file "package-exports")
+	       (:file "packages")
 	       (:file "utilities")
 	       (:file "macros")
+	       (:file "compilation-context")
 	       (:file "syntax")
+	       (:file "compilation-unit")
+	       (:file "term-operations")
 	       (:file "situation")
 	       (:file "parser")
 	       (:file "snark")

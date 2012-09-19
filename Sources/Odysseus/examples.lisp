@@ -74,23 +74,19 @@
      (celebrate ?p.person))))
 
 (defun run-example-7 ()
-  (handler-case
-      (interpret-and-print
-       '(seq
-         (work ?p.person)
-         (celebrate ?p.person)))
-    (error ()
-      :nobody-can-work-and-celebrate)))
+  (interpret-and-print
+   '(seq
+     (work ?p.person)
+     (celebrate ?p.person)))
+    :error-value :nobody-can-work-and-celebrate)
 
 (defun run-example-8 ()
-  (handler-case
-      (interpret-and-print
-       '(seq
-         (work ?p.person)
-         (no-operation)
-         (celebrate ?p.person)))
-    (error ()
-      :nobody-can-work-and-celebrate)))
+  (interpret-and-print
+   '(seq
+     (work ?p.person)
+     (no-operation)
+     (celebrate ?p.person))
+   :error-value :nobody-can-work-and-celebrate))
 
 (defun run-example-9 ()
   (interpret-and-print
@@ -104,7 +100,8 @@
   (mapcar (lambda (fun)
             (format t "~&Example: ~A" fun)
             (format t "~&Result: ~:W~2%" (funcall fun)))
-          '(run-example-1 run-example-2 run-example-3
+          '(run-example-0 run-example-0a run-example-0b
+	    run-example-1 run-example-2 run-example-3
             run-example-4 run-example-5 run-example-6
             run-example-7 run-example-8 run-example-9))
   :all-examples-completed)
