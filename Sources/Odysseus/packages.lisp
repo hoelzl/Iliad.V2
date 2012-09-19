@@ -25,7 +25,8 @@
   (:nicknames #:syntax)
   (:export . #.*odysseus-context-exports*)
   (:export . #.*odysseus-term-exports*)
-  (:export . #.*odysseus-operator-exports*))
+  (:export . #.*odysseus-operator-exports*)
+  (:export . #.*odysseus-situation-exports*))
 
 (defpackage #:odysseus-context
   (:use #:common-lisp #:alexandria #:iterate

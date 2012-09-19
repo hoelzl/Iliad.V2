@@ -158,19 +158,44 @@
       #:prove-using-snark))
   
   (defvar *odysseus-interpreter-exports*
-    '(#:interpreter
-      #:default-interpreter
+    '(#:runtime-error
+      #:no-state-for-situation-error
+      #:no-next-choice-point-error
+      #:online-mode-error
+      #:no-backtracking-in-online-mode-error
+      #:no-choice-point-creation-in-online-mode-error
+
+      #:interpreter
       #:reset-interpreter
+      #:interpreter-memento
       #:can-execute-p
+      #:choice-point
+      #:term #:situation #:interpreter-memento
       #:make-choice-point #:next-choice-point #:backtrack
+      #:stored-actions
+      #:execute-stored-actions #:execute-primitive-action
       #:state-map #:can-set-state-p #:state
-      #:basic-interpreter-state
-      #:basic-interpreter
+
+      #:primitive-action-definition
+      ;; These are originally exported from the context exports.  Not sure if
+      ;; we should have them here as well. --tc
+      #:the-empty-program-term #:the-no-operation-term
+      #:declare-primitive-action
+      #:declare-relational-fluent #:declare-functional-fluent
 
       #:trace-odysseus #:untrace-odysseus
 
+      #:top-level-context
+      #:basic-interpreter
+      #:choice-points #:onlinep
+      #:printing-interpreter
+
+      #:default-interpreter
+
       #:interpret-1
       #:skip-noops #:print-everything
-      #:interpret-and-print))
+      #:interpret
+
+      #:answer))
   ) ; eval-when
 

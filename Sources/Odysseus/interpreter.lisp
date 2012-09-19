@@ -7,6 +7,43 @@
 
 (in-package #:odysseus-interpreter)
 
+;;; Runtime Errors
+;;; ==============
+
+(define-condition runtime-error (simple-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "A runtime error occurred."))))
+
+(define-condition no-state-for-situation-error (runtime-error)
+  ((situation :reader situation :initarg :situation))
+  (:report (lambda (condition stream)
+             (format stream "No state for situation ~A."
+                     (situation condition)))))
+
+(define-condition no-next-choice-point-error (runtime-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "Tried to backtrack, but no choice point is left.")))) 
+
+(define-condition online-mode-error (runtime-error)
+  ())
+
+(define-condition no-backtracking-in-online-mode-error (online-mode-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream
+                     "Cannot backtrack to a previous choice point in online mode."))))
+
+(define-condition no-choice-point-creation-in-online-mode-error (online-mode-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "Cannot create a choice point in online mode."))))
+
 ;;; Interpreters
 ;;; ============
 
@@ -23,12 +60,24 @@
   (:documentation
    "The base class of all interpreters."))
 
-(defgeneric reset-interpreter (interpreter)
+(defgeneric reset-interpreter (interpreter &optional complete?)
   (:documentation
-   "Resets the state of INTERPRETER so that no primitive actions, fluents,
-   etc. are defined.")
-  (:method ((interpreter interpreter))
-    (setf (context interpreter) (make-instance 'compilation-unit))))
+   "Resets the state of INTERPRETER.  When COMPLETE? is false, removes all
+   choice points, saved states and other runtime information.  When COMPLETE?
+   is true, it also clears all primitive actions, fluents, etc.")
+  (:method ((interpreter interpreter) &optional (complete? nil))
+    (when complete?
+      (setf (context interpreter)
+            (make-instance (class-of (context interpreter)))))))
+
+(defgeneric interpreter-memento (interpreter)
+  (:documentation
+   "Returns a memento of INTERPRETER, i.e., its 'state' in a form that is
+suitable for storing it in a choice point."))
+
+(defgeneric (setf interpreter-memento) (new-memento interpreter)
+  (:documentation
+   "Restores INTERPRETER to the state in which NEW-MEMENTO was captured."))
 
 (defgeneric can-execute-p (interpreter primitive-action-term situation)
   (:documentation
@@ -47,6 +96,23 @@
   (:documentation
    "Abandons the current computation and continues execution of the
    interpreter at the previous choice point."))
+
+(defgeneric stored-actions (interpreter)
+  (:documentation
+   "The actions stored during the offline execution of the interpreter, in
+    reverse order in which they should be executed."))
+
+(defgeneric execute-stored-actions (interpreter)
+  (:documentation
+   "Executes all stored actions of INTERPRETER."))
+
+(defgeneric execute-primitive-action (interpreter term)
+  (:documentation
+   "Execute the primitive action TERM for INTEPRETER."))
+
+(defgeneric (setf stored-actions) (new-actions interpreter)
+  (:documentation
+   "Updates the action stored during offline execution."))
 
 (defgeneric state-map (interpreter)
   (:documentation
@@ -75,7 +141,7 @@ raises an error otherwise.")
       (or state
           (cond (errorp
                  (restart-case
-                     (error "No state for situation ~A." situation)
+                     (error 'no-state-for-situation-error :situation situation)
                    (provide-state (situation)
                      :test (lambda () (can-set-state-p interpreter situation))
                      :report "Provide a state for the situation."
@@ -133,19 +199,30 @@ raises an error otherwise.")
 (defun untrace-odysseus ()
   (setf *trace-odysseus* nil))
 
+
 ;;; The Class BASIC-INTERPRETER
 ;;; ---------------------------
               
-(defclass basic-interpreter-state (compilation-unit)
+(defclass top-level-context (compilation-unit)
   ()
   (:documentation
    "The state of a basic interpreter."))
 
 (defclass choice-point ()
-  ((term :accessor term :initarg :term
-         :initform (required-argument :term))
-   (situation :accessor situation :initarg :situation
-              :initform (required-argument :situation))))
+  ((term
+    :accessor term :initarg :term
+    :initform (required-argument :term)
+    :documentation
+    "The term that should be used to resume the execution.")
+   (situation
+    :accessor situation :initarg :situation
+    :initform (required-argument :situation)
+    :documentation "The situation in which the choice point was captured.")
+   (interpreter-memento
+    :accessor interpreter-memento :initarg :interpreter-memento
+    :initform (required-argument :interpreter-memento)
+    :documentation
+    "The state of the interpreter at the time the choice point was captured.")))
 
 (defclass basic-interpreter (interpreter)
   ((state-map
@@ -155,20 +232,55 @@ raises an error otherwise.")
     :accessor choice-points :initarg :choice-points
     :initform '()
     :documentation "A list of all available choice points.")
+   (stored-actions
+    :accessor stored-actions :initarg :stored-actions
+    :initform '())
    (onlinep 
-    :accessor onlinep :initarg :onlinep :initform nil
-    :documentation "Returns T if the interpreter is in online mode.")))
+    :accessor onlinep :initarg :onlinep :initform t
+    :documentation "Returns T if the interpreter is in online mode."))
+  (:default-initargs :context (make-instance 'top-level-context)))
+
+(defmethod print-object ((self basic-interpreter) stream)
+  (print-unreadable-object (self stream :type t)
+    (format stream "(~:[OFFLINE~;ONLINE~])"
+            (onlinep self))))
+
+(defmethod reset-interpreter
+    ((interpreter basic-interpreter) &optional (complete? nil))
+  (call-next-method interpreter complete?)
+  (setf (state-map interpreter) (make-hash-table)
+        (choice-points interpreter) '()
+        (stored-actions interpreter) '()
+        (onlinep interpreter) t))
 
 (defvar *print-snark-timeouts* t)
 (defvar *print-snark-refutations* t)
 
+(defclass basic-interpreter-memento ()
+  ((stored-actions
+    :accessor stored-actions :initarg :stored-actions
+    :initform (required-argument :stored-actions)))
+  (:documentation
+   "The memento for a basic interpreter."))
+
+(defmethod interpreter-memento ((interpreter basic-interpreter))
+  (make-instance 'basic-interpreter-memento
+                 :stored-actions (stored-actions interpreter)))
+
+(defmethod (setf interpreter-memento)
+    ((new-memento basic-interpreter-memento) (interpreter basic-interpreter))
+  (setf (stored-actions interpreter) (stored-actions new-memento)))
+
 (defmethod can-execute-p
-  ((interpreter basic-interpreter) (term primitive-action-term) situation)
+    ((interpreter basic-interpreter) (term primitive-action-term) situation)
   (let ((action-def (primitive-action-definition (operator term) interpreter)))
     (if (not (action-precondition action-def))
+        ;; Terms without precondition can always execute.
         (values t :no-precondition '() '())
+        ;; TERM has a precondition.  Pass it to Snark for evaluation.
         (let* ((proof-term `(poss ,(to-sexpr term) ,(to-sexpr situation)))
-               (free-variables (free-variables term))
+               (free-variables (union (free-variables term)
+                                      (free-variables situation)))
                (free-variable-sexprs (mapcar 'to-sexpr free-variables)))
           (multiple-value-bind (result reason answer)
               (prove-using-snark proof-term
@@ -182,24 +294,38 @@ raises an error otherwise.")
                 (format t "~&Timeout while proving~25T~:W." proof-term)))
             (values result reason free-variables answer))))))
 
+(defmethod execute-stored-actions ((interpreter basic-interpreter))
+  (let ((actions (nreverse (stored-actions interpreter))))
+    (dolist (action actions)
+      (execute-primitive-action interpreter action))
+    (setf (stored-actions interpreter) '())))
+
 (defmethod make-choice-point
-    ((interpreter basic-interpreter) term situation)
+    ((interpreter interpreter) term situation)
   (when (onlinep interpreter)
     (cerror "Create the choice point anyway."
-            "Cannot create a choice point in online mode."))
-  (push (make-instance 'choice-point :term term :situation situation)
-        (choice-points interpreter)))
+            'no-choice-point-creation-in-online-mode-error))
+  (let ((cp (make-instance
+             'choice-point
+             :term term
+             :situation situation
+             :interpreter-memento (interpreter-memento interpreter))))
+    ;; (push cp (choice-points interpreter))
+    cp))
 
 (defmethod next-choice-point ((interpreter basic-interpreter))
   (if (null (choice-points interpreter))
-      (error "Computation failed.")
+      (error 'no-next-choice-point-error)
+      ;; This should be controllable by an execution strategy.
       (pop (choice-points interpreter))))
 
-(defmethod backtrack ((interpreter basic-interpreter))
+(defmethod backtrack ((interpreter interpreter))
   (let ((choice-point (next-choice-point interpreter)))
     (when (onlinep interpreter)
       (cerror "Backtrack anyway."
-              "Cannot backtrack to a previous choice point in online mode."))
+              'no-backtracking-in-online-mode-error))
+    (setf (interpreter-memento interpreter)
+          (interpreter-memento choice-point))
     (interpret-1 interpreter (term choice-point) (situation choice-point))))
 
 (defmethod can-set-state-p ((interpreter basic-interpreter) situation)
@@ -217,19 +343,6 @@ raises an error otherwise.")
          (setf (gethash situation (state-map interpreter))
                new-state))))
 
-;;; Default Interpreter
-;;; ===================
-
-(defvar *default-interpreter*
-  (make-instance 'basic-interpreter))
-
-(defun default-interpreter ()
-  "Returns the default interpreter."
-  *default-interpreter*)
-
-(defun (setf default-interpreter) (new-interpreter)
-  "Sets the default interpreter."
-  (setf *default-interpreter* new-interpreter))
 
 ;;; Single-Step Interpretation
 ;;; ==========================
@@ -257,83 +370,151 @@ returned as first argument."))
           term ;; FIXME: This should be an error term.
           situation))
 
+(defun maybe-output-execution-trace-information
+    (action term reason free-variables answer)
+  (when *trace-odysseus*
+    (if (or (eql reason :no-precondition)
+            (null free-variables))
+        (format t "~&~A~25T~:W:~%  Reason:~25T~A~%"
+                action (to-sexpr term) reason)
+        (format t "~&~A~25T~:W:~%  Reason:~25T~A~%  ~
+                   Free Variables:~25T~:W~%  Answer:~25T~:W~%"
+                action
+                (to-sexpr term)
+                reason
+                (mapcar 'to-sexpr free-variables)
+                answer))))
+
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term primitive-action-term) situation)
   (multiple-value-bind (can-execute-p reason free-variables answer)
       (can-execute-p interpreter term situation)
-    (flet ((maybe-output-trace-information (action)
-             (when *trace-odysseus*
-               (if (or (eql reason :no-precondition)
-                       (null free-variables))
-                   (format t "~&~A~25T~:W:~%  Reason:~25T~A~%"
-                           action (to-sexpr term) reason)
-                   (format t "~&~A~25T~:W:~%  ~
-                           Reason:~25T~A~%  ~
-                           Free Variables:~25T~:W~%  Answer:~25T~:W~%"
-                           action
-                           (to-sexpr term)
-                           reason
-                           (mapcar 'to-sexpr free-variables)
-                           answer)))))
-      (cond (can-execute-p
-             (maybe-output-trace-information "Executing")
-             (values term
-                     (the-empty-program-term interpreter)
-                     (make-instance 'successor-situation
-                                    :action term
-                                    :previous-situation situation)))
-            (t
-             (maybe-output-trace-information "NOT Executing")
-             (backtrack interpreter))))))
+    (cond (can-execute-p
+           (cond ((onlinep interpreter)
+                  (maybe-output-execution-trace-information
+                   ">>> Executing" term reason free-variables answer)
+                  (values term
+                          (the-empty-program-term interpreter)
+                          (make-instance 'successor-situation
+                                         :action term
+                                         :previous-situation situation)))
+                 (t
+                  (maybe-output-execution-trace-information
+                   "Storing" term reason free-variables answer)
+                  (push term (stored-actions interpreter))
+                  (values (the-no-operation-term interpreter)
+                          (the-empty-program-term interpreter)
+                          (make-instance 'successor-situation
+                                         :action term
+                                         :previous-situation situation)))))
+          (t
+           (maybe-output-execution-trace-information
+            "NOT Executing" term reason free-variables answer)
+           (backtrack interpreter)))))
 
-(defmethod interpret-1
-    ((interpreter basic-interpreter) (term sequence-term) situation)
+(defun interpret-1-body-term (interpreter term situation)
   (let ((body (body term)))
     (cond ((null body)
-	   (interpret-1 interpreter (the-empty-program-term interpreter) situation))
+	   (interpret-1 interpreter
+                        (the-empty-program-term interpreter)
+                        situation))
 	  ((null (rest body))
-	   (interpret-1 interpreter (first body) situation))
+	   (interpret-1 interpreter
+                        (first body)
+                        situation))
 	  (t
 	   (multiple-value-bind (action rest-term new-situation)
 	       (interpret-1 interpreter (first body) situation)
-	     (if (is-final-term-p rest-term)
-		 (values action
-                         (make-instance 'sequence-term
-					:context (context term)
-					:body (rest body))
-                         new-situation)
-		 (values action
-                         (make-instance 'sequence-term
-					:context (context term)
-					:body (cons rest-term (rest body)))
-                         new-situation)))))))
+             (let ((new-term
+                     (make-instance (class-of term)
+                                    :context (context term)
+                                    :source :generated-term
+                                    :body (if (is-final-term-p rest-term)
+                                              (rest body)
+                                              (cons rest-term (rest body))))))
+               (values action
+                       new-term
+                       new-situation)))))))
+
+(defmethod interpret-1
+    ((interpreter basic-interpreter) (term sequence-term) situation)
+  (interpret-1-body-term interpreter term situation))
+
+(defmethod interpret-1
+    ((interpreter basic-interpreter) (term search-term) situation)
+  (let ((old-onlinep (onlinep interpreter)))
+    (setf (onlinep interpreter) nil)
+    (multiple-value-bind (action rest-term new-situation)
+        (interpret-1-body-term interpreter term situation)
+      (setf (onlinep interpreter) old-onlinep)
+      (values action
+              rest-term
+              new-situation))))
+
+(defmethod interpret-1
+    ((interpreter basic-interpreter) (term action-choice-term) situation)
+  (if (onlinep interpreter)
+      (interpret-1 interpreter (random-elt (body term)) situation)
+      (let ((choice-points
+              (mapcar (lambda (choice)
+                        (make-choice-point interpreter choice situation))
+                      (reverse (body term)))))
+        (setf (choice-points interpreter)
+              (append choice-points (choice-points interpreter)))
+        (backtrack interpreter))))
+
 
 ;;; Interpretation
 ;;; ==============
 
-;;; The following are possible variants for interpreters.
+;;; The following are possible variants for (multi-step) interpreters.
 
-(defun skip-noops (term)
-  (not (typep term 'no-operation-term)))
+(defclass printing-interpreter (basic-interpreter)
+  ((skip-noops :accessor skip-noops :initarg :skip-noops
+               :initform t)))
 
-(defun print-everything (term)
-  (declare (ignore term))
-  t)
+(defmethod execute-primitive-action
+    ((interpreter printing-interpreter) (term primitive-action-term))
+  (unless (and (skip-noops interpreter) (typep term 'no-operation-term))
+    (format t "~&*** Performing Action ~25T~:W~60T**********~%"
+            (to-sexpr term))))
 
-(defun interpret-and-print (term &key (interpreter (default-interpreter))
-                                      (situation (make-instance 'initial-situation))
-                                      (test 'skip-noops)
-                                      (error-value :execution-failed))
+
+;;; Default Interpreter
+;;; ===================
+
+(defvar *default-interpreter*
+  (make-instance 'printing-interpreter))
+
+(defun default-interpreter ()
+  "Returns the default interpreter."
+  *default-interpreter*)
+
+(defun (setf default-interpreter) (new-interpreter)
+  "Sets the default interpreter."
+  (setf *default-interpreter* new-interpreter))
+
+;;; Multi-Step Interpretation
+;;; =========================
+
+(defun interpret (term &key (interpreter (default-interpreter))
+                            (situation (make-instance 'initial-situation))
+                            (error-value :execution-failed))
   (labels ((recurse (term situation)
              (multiple-value-bind (action rest-term new-situation)
                  (interpret-1 interpreter term situation)
-               (when (funcall test action)
-                 (format t "~&*** Performing Action ~25T~:W ***~%" (to-sexpr action)))
-               (if (is-final-term-p rest-term)
-                   (to-sexpr new-situation)
-                   (recurse rest-term new-situation)))))
+               (unless (typep action 'no-operation-term)
+                 (assert (onlinep interpreter) ()
+                         "Cannot execute actions while the interpreter is offline.")
+                 (execute-stored-actions interpreter))
+               (execute-primitive-action interpreter action)
+               (cond ((is-final-term-p rest-term)
+                      (execute-stored-actions interpreter)
+                      (to-sexpr new-situation))
+                     (t
+                      (recurse rest-term new-situation))))))
     (handler-case
         (recurse term situation)
-      (error ()
+      (runtime-error ()
         error-value))))
       

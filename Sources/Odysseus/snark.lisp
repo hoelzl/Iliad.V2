@@ -59,7 +59,7 @@
 			    &allow-other-keys)
   (let* ((initial-run-time-limit 0.1)
 	 (run-time-limit initial-run-time-limit)
-	 (iterations 6))
+	 (iterations 20))
     (dotimes (i iterations)
       (initialize-snark)
       (run-time-limit run-time-limit)

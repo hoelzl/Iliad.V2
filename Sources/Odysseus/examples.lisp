@@ -21,87 +21,126 @@
 (declare-primitive-action 'sleep (default-interpreter))
 (declare-primitive-action 'celebrate (default-interpreter))
 
-(defun run-example-0 ()
-  (interpret-and-print
-   '(celebrate annabelle)))
+(defexample interpret-01 ()
+  (celebrate annabelle))
 
-(defun run-example-0a ()
-  (interpret-and-print
-   '(seq 
-     (celebrate annabelle))))
+(defexample interpret-01a ()
+  (seq 
+   (celebrate annabelle)))
 
-(defun run-example-0b ()
-  (interpret-and-print
-   '(seq
-     (no-operation)
-     (celebrate annabelle))))
+(defexample interpret-01b ()
+  (seq
+   (no-operation)
+   (celebrate annabelle)))
 
-(defun run-example-1 ()
-  (interpret-and-print 
-   '(seq
-     (eat lenz)
-     (sleep lenz)
-     (celebrate lenz))))
+(defexample interpret-01c ()
+  (celebrate lenz))
 
-(defparameter *program-1*
-  '(seq
-    (eat ?p.person)
-    (sleep ?p.person)
-    (celebrate ?p.person)))
+(defexample interpret-02 ()
+  (seq
+   (eat lenz)
+   (sleep lenz)
+   (celebrate lenz)))
 
-(defun run-example-2 ()
-  (interpret-and-print *program-1*))
+(defexample interpret-02a ()
+  (eat lenz)
+  (sleep lenz)
+  (celebrate lenz))
 
-(defun run-example-3 ()
-  (interpret-and-print *program-1* :test 'print-everything))
+(defexample interpret-03 ()
+  (seq
+   (eat ?p.person)
+   (sleep ?p.person)
+   (celebrate ?p.person)))
 
-(defparameter *program-2*
-  '(seq
-    (eat ?p.person)
-    (sleep ?p.person)
-    (no-operation)
-    (celebrate ?p.person)))
+(defexample interpret-04 ()
+  (seq
+   (eat ?p.person)
+   (sleep ?p.person)
+   (no-operation)
+   (celebrate ?p.person)))
 
-(defun run-example-4 ()
-  (interpret-and-print *program-2*))
+(defexample interpret-05 ()
+  (seq
+   (celebrate ?p.person)))
 
-(defun run-example-5 ()
-  (interpret-and-print *program-2* :test 'print-everything))
+(defexample interpret-06 (:error-value :nobody-can-work-and-celebrate)
+  (seq
+   (work ?p.person)
+   (celebrate ?p.person)))
 
-(defun run-example-6 ()
-  (interpret-and-print
-   '(seq
-     (celebrate ?p.person))))
+(defexample interpret-06a (:error-value :nobody-can-work-and-celebrate)
+  (search
+   (work ?p.person)
+   (celebrate ?p.person)))
 
-(defun run-example-7 ()
-  (interpret-and-print
-   '(seq
-     (work ?p.person)
-     (celebrate ?p.person)))
-    :error-value :nobody-can-work-and-celebrate)
+(defexample interpret-07 (:error-value :nobody-can-work-and-celebrate)
+  (seq
+   (work ?p.person)
+   (no-operation)
+   (celebrate ?p.person)))
 
-(defun run-example-8 ()
-  (interpret-and-print
-   '(seq
-     (work ?p.person)
-     (no-operation)
-     (celebrate ?p.person))
-   :error-value :nobody-can-work-and-celebrate))
+(defexample interpret-08 ()
+  (seq
+   (work ?p.person)
+   (sleep annabelle)
+   (celebrate ?p.person)))
 
-(defun run-example-9 ()
-  (interpret-and-print
-   '(seq
-     (work ?p.person)
-     (sleep annabelle)
-     (celebrate ?p.person))))
+(defexample interpret-09 ()
+  (search
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (celebrate ?p.person)))
 
+(defexample interpret-09a ()
+  (search
+   (eat ?p.person)
+   (work ?p.person)
+   (eat ?p.person)
+   (celebrate ?p.person)))
 
-(defun run-all-examples ()
-  (mapcar (lambda (fun)
-            (format t "~&Example: ~A" fun)
-            (format t "~&Result: ~:W~2%" (funcall fun)))
-          '(run-example-0 run-example-0a run-example-0b
-	    run-example-1 run-example-2 run-example-3
-            run-example-4 run-example-5 run-example-6
-            run-example-7 run-example-8 run-example-9))
-  :all-examples-completed)
+(defexample interpret-09b ()
+  (search
+   (eat ?p.person)
+   (sleep ?p.person)
+   (eat ?p.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-09c ()
+  (search
+   (eat ?p.person)
+   (work ?p.person)
+   (eat ?p.person)
+   (sleep ?p.person)
+   (eat ?p.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-10 ()
+  (choose
+   (sleep ?p.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-11 ()
+  (search
+   (choose
+    (celebrate ?p.person)
+    (seq
+     (sleep ?p.person)
+     (celebrate ?p.person)))))
+
+(defexample interpret-12 ()
+  (search
+   (choose
+    (celebrate ?p.person)
+    (seq
+     (sleep ?p.person)
+     (celebrate ?p.person)))))
+
+(defexample interpret-12a ()
+  (search
+   (choose
+    (celebrate ?p.person)
+    (seq
+     (sleep ?p.person)
+     (celebrate lenz)))))

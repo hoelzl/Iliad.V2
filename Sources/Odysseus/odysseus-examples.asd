@@ -13,4 +13,6 @@
 	       #:closer-mop
 	       #:odysseus)
   :components ((:file "snark-setup-for-examples")
+	       (:file "macros-for-examples")
+	       (:file "support-for-examples")
 	       (:file "examples")))

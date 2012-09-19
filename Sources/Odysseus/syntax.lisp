@@ -241,10 +241,6 @@ fluent definition for OPERATOR in CONTEXT.")
 
 (define-interning-make-instance variable name)
 
-(defmethod print-object ((term variable-term) stream)
-  (print-unreadable-object (term stream :type t :identity t)
-    (format stream "~A" (name term))))
-
 (defun make-variable-term (name context &key (intern t) (is-bound-p nil))
   (assert (typep name 'symbol) (name)
           "~A cannot denote a variable (it is not a symbol)." name)
@@ -336,10 +332,6 @@ structure."))
 
 (defgeneric (setf arguments) (new-value application-term)
   (:documentation "Set the arguments of APPLICATION-TERM to NEW-VALUE."))
-
-(defmethod print-object ((term application-term) stream)
-  (print-unreadable-object (term stream :type t :identity t)
-    (format stream "~A" (source term))))
 
 (defclass arguments-mixin ()
   ((arguments :accessor arguments :initarg :arguments :initform '()
