@@ -25,7 +25,9 @@
    (term :accessor term :initarg :term
 	 :initform (required-argument :term))
    (keys :accessor keys :initarg :keys
-	 :initform '())))
+	 :initform '())
+   (hidden? :accessor hidden? :initarg :hidden?
+	    :initform nil)))
 
 (defmethod initialize-instance :after ((self odysseus-example) &key name)
   (add-example name self))
@@ -52,7 +54,9 @@
 
 (defun run-examples (examples &optional (execution-mode :online))
   (mapc (lambda (example)
-	  (run-example example execution-mode))
+	  (setf example (find-example example))
+	  (unless (or (null example) (hidden? example))
+	    (run-example example execution-mode)))
 	examples))
 
 (defun run-all-examples (&optional (execution-mode :online))

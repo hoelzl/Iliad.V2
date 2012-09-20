@@ -7,10 +7,11 @@
 
 (in-package #:odysseus-user)
 
-(defmacro defexample (name (&rest keys) &body term)
+(defmacro defexample (name (&key hidden? keys) &body term)
   `(make-instance 'odysseus-example
 		  :name ',name
 		  :term ',(if (null (rest term))
                               (first term)
                               (cons 'seq term))
-                  :keys ',keys))
+                  :keys ,keys
+                  :hidden? ,hidden?))
