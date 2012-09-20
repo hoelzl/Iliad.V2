@@ -94,20 +94,27 @@
    (celebrate ?p.person)))
 
 (defexample interpret-09a ()
-  (search
+  (seq
    (eat ?p.person)
-   (work ?p.person)
+   (eat ?p.person)
    (eat ?p.person)
    (celebrate ?p.person)))
 
 (defexample interpret-09b ()
   (search
    (eat ?p.person)
-   (sleep ?p.person)
+   (work ?p.person)
    (eat ?p.person)
    (celebrate ?p.person)))
 
 (defexample interpret-09c ()
+  (search
+   (eat ?p.person)
+   (sleep ?p.person)
+   (eat ?p.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-09d ()
   (search
    (eat ?p.person)
    (work ?p.person)
@@ -144,3 +151,10 @@
     (seq
      (sleep ?p.person)
      (celebrate lenz)))))
+
+(defexample interpret-12b ()
+  (choose
+   (celebrate ?p.person)
+   (seq
+    (sleep ?p.person)
+    (celebrate lenz))))

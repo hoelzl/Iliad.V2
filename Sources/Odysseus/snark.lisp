@@ -81,9 +81,9 @@
 	   (let ((result (apply 'ida-prove-or-refute term args)))
 	     (case result
 	       (:proof-found
-		(values t :proof-found (answer)))
+		(values t :proof-found (answer t)))
 	       (:refutation-found
-		(values nil :refutation-found (answer)))
+		(values nil :refutation-found (answer t)))
 	       (otherwise
 		(values nil :timeout nil))))))
     (if *print-snark-output*

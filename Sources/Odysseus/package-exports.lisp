@@ -110,7 +110,9 @@
       #:domain-definition-term
       
       #:to-sexpr
-      #:free-variables #:free-variable-sexprs))
+      #:free-variables #:free-variable-sexprs
+      #:contains-variable-p
+      #:substitute-term #:substitute-terms))
   
   (defvar *odysseus-operator-exports*
     '("&" "," ";" "~" "->" "=>" "<-" "<=" "<->" "<=>"

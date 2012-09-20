@@ -86,6 +86,14 @@ argument list."
 (defmethod parse-into-term-representation ((exp string) (context compilation-context))
   (make-instance 'primitive-term :value exp :context context))
 
+(defmethod parse-into-term-representation
+    ((exp snark::variable) (context compilation-context))
+  (parse-into-term-representation
+   (intern (format nil "?SV~A.~A"
+                   (snark::variable-number exp)
+                   (snark::variable-sort exp)))
+   context))
+
 (defmethod parse-into-term-representation ((exp cons) (context compilation-context))
   (let* ((operator (first exp))
 	 (known-type (term-type-for-operator operator context nil))

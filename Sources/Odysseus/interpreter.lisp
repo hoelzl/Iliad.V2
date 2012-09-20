@@ -44,6 +44,12 @@
              (declare (ignore condition))
              (format stream "Cannot create a choice point in online mode."))))
 
+(define-condition unbound-variable-during-online-execution (online-mode-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "Cannot execute actions containing variables in online mode."))))
+
 ;;; Interpreters
 ;;; ============
 
@@ -295,10 +301,16 @@ raises an error otherwise.")
             (values result reason free-variables answer))))))
 
 (defmethod execute-stored-actions ((interpreter basic-interpreter))
-  (let ((actions (nreverse (stored-actions interpreter))))
-    (dolist (action actions)
-      (execute-primitive-action interpreter action))
-    (setf (stored-actions interpreter) '())))
+  (let ((actions (nreverse (stored-actions interpreter)))
+        (old-onlinep (onlinep interpreter)))
+    (when actions
+      (when *trace-odysseus*
+        (format t "~&>>> Executing stored actions.~%"))
+      (setf (onlinep interpreter) nil)
+      (dolist (action actions)
+        (execute-primitive-action interpreter action))
+      (setf (onlinep interpreter) old-onlinep)
+      (setf (stored-actions interpreter) '()))))
 
 (defmethod make-choice-point
     ((interpreter interpreter) term situation)
@@ -390,28 +402,41 @@ returned as first argument."))
   (multiple-value-bind (can-execute-p reason free-variables answer)
       (can-execute-p interpreter term situation)
     (cond (can-execute-p
-           (cond ((onlinep interpreter)
-                  (maybe-output-execution-trace-information
-                   ">>> Executing" term reason free-variables answer)
-                  (values term
-                          (the-empty-program-term interpreter)
-                          (make-instance 'successor-situation
-                                         :action term
-                                         :previous-situation situation)))
-                 (t
-                  (maybe-output-execution-trace-information
-                   "Storing" term reason free-variables answer)
-                  (push term (stored-actions interpreter))
-                  (values (the-no-operation-term interpreter)
-                          (the-empty-program-term interpreter)
-                          (make-instance 'successor-situation
-                                         :action term
-                                         :previous-situation situation)))))
-          (t
-           (maybe-output-execution-trace-information
-            "NOT Executing" term reason free-variables answer)
-           (backtrack interpreter)))))
-
+           (let* ((context (context interpreter))
+                  (new-terms
+                    (mapcar (lambda (exp)
+                              (parse-into-term-representation exp context))
+                            (rest answer))))
+             (when new-terms
+               (setf term (substitute-terms new-terms free-variables term)
+                       (stored-actions interpreter)
+                       (mapcar (lambda (action)
+                                 (substitute-terms new-terms free-variables action))
+                             (stored-actions interpreter)))
+               (unless (onlinep interpreter)
+                 (setf situation (substitute-terms new-terms free-variables situation))))
+             (cond ((onlinep interpreter)
+                    (maybe-output-execution-trace-information
+                     ">>> Executing" term reason free-variables answer)
+                    (values term
+                            (the-empty-program-term interpreter)
+                            (make-instance 'successor-situation
+                              :action term
+                              :previous-situation situation)))
+                   (t
+                    (maybe-output-execution-trace-information
+                     "Storing" term reason free-variables answer)
+                    (push term (stored-actions interpreter))
+                    (values (the-no-operation-term interpreter)
+                            (the-empty-program-term interpreter)
+                            (make-instance 'successor-situation
+                              :action term
+                              :previous-situation situation))))))
+           (t
+            (maybe-output-execution-trace-information
+             "NOT Executing" term reason free-variables answer)
+            (backtrack interpreter)))))
+  
 (defun interpret-1-body-term (interpreter term situation)
   (let ((body (body term)))
     (cond ((null body)
@@ -475,6 +500,9 @@ returned as first argument."))
 
 (defmethod execute-primitive-action
     ((interpreter printing-interpreter) (term primitive-action-term))
+  (when (and (onlinep interpreter) (contains-variable-p term))
+    (cerror "Continue execution anyway."
+            'unbound-variable-during-online-execution))
   (unless (and (skip-noops interpreter) (typep term 'no-operation-term))
     (format t "~&*** Performing Action ~25T~:W~60T**********~%"
             (to-sexpr term))))

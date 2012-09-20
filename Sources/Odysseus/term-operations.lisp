@@ -109,4 +109,59 @@
   (:method ((term successor-situation))
     (or (contains-variable-p (action term))
 	(contains-variable-p (previous-situation term)))))
+
     
+(defgeneric substitute-term (new-term old-term term)
+  (:documentation
+   "Substitute NEW-TERM for OLD-TERM in TERM.")
+
+  (:method (new-term old-term term-or-situation)
+    (if (eql old-term term-or-situation)
+	new-term
+	term-or-situation))
+
+  (:method (new-term old-term (term unknown-general-application-term))
+    (make-instance (class-of term)
+      :operator (operator term)
+      :arguments (mapcar (lambda (arg)
+                           (substitute-term new-term old-term arg))
+                         (arguments term))
+      :context (context term)
+      :source :generated-term))
+  
+  (:method (new-term old-term (term known-application-term))
+    (make-instance (class-of term)
+      :arguments (mapcar (lambda (arg)
+                           (substitute-term new-term old-term arg))
+                         (arguments term))
+      :context (context term)
+      :source :generated-term))
+
+  ;; TODO: Whether and how to substitute into definition terms? --tc
+
+  (:method (new-term old-term (term successor-situation))
+    (make-instance (class-of term)
+      :action (substitute-term new-term old-term (action term))
+      :previous-situation (substitute-term new-term old-term (previous-situation term)))))
+
+(defgeneric substitute-terms (new-terms old-terms term)
+  (:documentation
+   "Substitute NEW-TERMS for OLD-TERMS in TERM.")
+
+  (:method (new-terms old-terms term)
+    (error "Don't know how to substitute ~:W for ~:W in ~:W."
+           new-terms old-terms term))
+
+  (:method ((new-terms list) (old-terms list) term-or-situation)
+    (cond ((null new-terms)
+           (assert (null old-terms) ()
+                   "More old terms than new terms: ~:W."
+                   old-terms)
+           term-or-situation)
+          (t
+           (assert (not (null old-terms)) ()
+                   "More new terms than old terms: ~:W.")
+           (let ((new-term
+                   (substitute-term (first new-terms) (first old-terms)
+                                    term-or-situation)))
+             (substitute-terms (rest new-terms) (rest old-terms) new-term))))))
