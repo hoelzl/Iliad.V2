@@ -16,7 +16,9 @@
 </p>
 
 *Iliad*, the *Implementation of Logical Inference for Adaptive
-Devices* is the infrastructure for the *Poem* implementation.  
+Devices* is the infrastructure for the *Poem* language.  *Poem*
+is the high-level modeling language of the
+[ASCENS](http://www.ascens-ist.eu) project.
 
 Odysseus
 --------
@@ -60,9 +62,25 @@ To run *Iliad* you need:
 
 ### Installing from sources
 
-To install *Iliad* from sources so that it can be executed from within
-your Lisp system:
+You interact with *Iliad* from the read-eval-print loop of your Lisp
+system.  To install *Iliad* from sources you have to perform the
+following steps.
 
+* Download the Snark theorem prover.  The original sources are
+  available from
+  [Mark Stickel's page](http://www.ai.sri.com/~stickel/snark.html),
+  however it is probably easier if you get the copy from
+  [my github page](https://github.com/hoelzl/Snark).  The latter
+  version contains ASDF system definitions which simplify the
+  integration with *Iliad*.  Unpack the sources in a location where
+  ASDF can find them.  To add additional directories to ASDF's search
+  path you might have to add a form like
+  <pre>
+    (:source-registry
+        (:tree (:home "Prog/Lisp/Hacking/"))
+        (:tree (:home "Prog/Lisp/Imported-Projects/"))
+        :inherit-configuration)</pre>
+  to the file `~/.config/common-lisp/source-registry.conf`.
 * Download the sources of the latest *Iliad* release from the github
   page at https://github.com/hoelzl/Iliad/tags and unpack them in a
   location where ASDF can find them.  (To simplify updating to newer
@@ -70,14 +88,7 @@ your Lisp system:
   `git clone git://github.com/hoelzl/Iliad.git` or one of the other
   methods given on the project page (https://github.com/hoelzl/Iliad).
   If you are feeling adventurous and want to get the latest features
-  you can checkout the development branch instead.)  To add additional
-  directories to ASDF's search path you might have to add a form like  
-  <pre>
-    (:source-registry
-        (:tree (:home "Prog/Lisp/Hacking/"))
-        (:tree (:home "Prog/Lisp/Test-Projects/"))
-        :inherit-configuration)</pre>
-  to the file `~/.config/common-lisp/source-registry.conf`.
+  you can checkout the development branch instead.)  
 * Start your Lisp implementation and enter the following command:
   <pre>(asdf:load-system :iliad)</pre>
   This builds and loads all dependencies and the *Iliad* system.
@@ -96,29 +107,39 @@ You can work interactively with *Odysseus* in the following way:
     CL-USER> (asdf:load-system :iliad)
     T
     CL-USER> (in-package :odysseus-user)
-    #<Package "ODYSSEUS-USER">
-    ODYSSEUS-USER> (define-primitive-action eat)
-    #<STANDARD-METHOD DECLARE-PRIMITIVE-ACTION ((EQL EAT) T)>
-    ODYSSEUS-USER> (declare-primitive-action 'eat *default-interpreter-state*)
-    #<PRIMITIVE-ACTION-DEFINITION #x302000FA29BD>
-    ODYSSEUS-USER> (define-primitive-action sleep)
-    #<STANDARD-METHOD DECLARE-PRIMITIVE-ACTION ((EQL SLEEP) T)>
-    ODYSSEUS-USER> (declare-primitive-action 'sleep *default-interpreter-state*)
-    #<PRIMITIVE-ACTION-DEFINITION #x30200100987D>
-    ODYSSEUS-USER> (define-primitive-action celebrate)
-    #<STANDARD-METHOD DECLARE-PRIMITIVE-ACTION ((EQL CELEBRATE) T)>
-    ODYSSEUS-USER> (declare-primitive-action 'celebrate *default-interpreter-state*)
-    #<PRIMITIVE-ACTION-DEFINITION #x302001030B5D>
-    ODYSSEUS-USER> (interpret-and-print
-    		'(seq
-    		  (eat something)
-    		  (sleep several hours)
-    		  (celebrate)))
-    
-    (EAT SOMETHING) 
-    (SLEEP SEVERAL HOURS) 
-    (CELEBRATE) 
-    :DONE
+    #<PACKAGE "ODYSSEUS-USER">
+    ODYSSEUS-USER> (define-primitive-action eat '(person))
+    #<STANDARD-METHOD DECLARE-PRIMITIVE-ACTION ((EQL EAT) COMPILATION-CONTEXT) {1006C74063}>
+    ODYSSEUS-USER> (declare-primitive-action 'eat (default-interpreter))
+    #<PRIMITIVE-ACTION-DEFINITION {1006E89BC3}>
+    ODYSSEUS-USER> (define-primitive-action sleep '(person))
+    #<STANDARD-METHOD DECLARE-PRIMITIVE-ACTION ((EQL SLEEP) COMPILATION-CONTEXT) {10074436C3}>
+    ODYSSEUS-USER> (declare-primitive-action 'sleep (default-interpreter))
+    #<PRIMITIVE-ACTION-DEFINITION {1007552113}>
+    ODYSSEUS-USER> (define-primitive-action celebrate '(person))
+    #<STANDARD-METHOD DECLARE-PRIMITIVE-ACTION ((EQL CELEBRATE) COMPILATION-CONTEXT) {1007645983}>
+    ODYSSEUS-USER> (declare-primitive-action 'celebrate (default-interpreter))
+    #<PRIMITIVE-ACTION-DEFINITION {100775A423}>
+    ODYSSEUS-USER> (interpret
+        		'(seq
+        		  (eat something)
+        		  (sleep several hours)
+        		  (celebrate)))
+    >>> Executing            (EAT SOMETHING):
+      Reason:                NO-PRECONDITION
+    *** Performing Action    (EAT SOMETHING)                    **********
+    >>> Executing            (SLEEP SEVERAL HOURS):
+      Reason:                NO-PRECONDITION
+    *** Performing Action    (SLEEP SEVERAL HOURS)              **********
+    >>> Executing            (CELEBRATE):
+      Reason:                NO-PRECONDITION
+    *** Performing Action    (CELEBRATE)                        **********
+    (DO (CELEBRATE)
+        (DO
+         (SLEEP SEVERAL HOURS)
+         (DO (EAT
+              SOMETHING)
+             S0)))
     ODYSSEUS-USER> 
 
 
@@ -127,14 +148,24 @@ Supported Lisp Implementations
 
 *Iliad* has been tested on the folowing implementations running on OSX:
 
-* Armed Bear Common Lisp: 1.0.1-svn-13750-13751
 * Clozure Common Lisp: Version 1.8-r15378M  (DarwinX8664)
 * CMU Common Lisp: 20c release-20c (20C Unicode)
-* ECL: 12.7.1
 * SBCL: 1.0.58
 
 It should be straightforward to port *Iliad* to other Lisp
 implementations or operating systems.
+
+The following Lisp implementations don't seem to work:
+
+* Armed Bear Common Lisp: 1.0.1-svn-13750-13751: Seems to run into the
+  `java.lang.OutOfMemoryError: PermGen space` error no matter how much
+  memory I allocate on the command line.  Tips for solving this
+  problem are very welcome.
+* ECL: 12.7.1: Fails with an internal error while compiling Snark.
+  
+I haven't tried running *Iliad* on LispWorks, ACL, CLisp or any other
+Lisp implementation.  Reports and bug fixes are always welcome.
+
 
 The Workflow for the *Poem* Project
 -----------------------------------
@@ -148,9 +179,12 @@ The Workflow for the *Poem* Project
 </p>
 
 I am currently experimenting with the git-flow branching model for
-*Poem*.  Please see the article "[A successful Git branching
-model](http://nvie.com/posts/a-successful-git-branching-model/)" for
-details.
+*Poem*.  Please see the article
+"[A successful Git branching model](http://nvie.com/posts/a-successful-git-branching-model/)"
+for details.  Furthermore, I try to write the commit messages loosely
+based on the
+[Note About Git Commit Messages](http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html)
+from tbaggery.
 
 
 About this Document
