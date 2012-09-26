@@ -159,6 +159,10 @@ fluent definition for OPERATOR in CONTEXT.")
   (:documentation
    "Mixin inherited by all classes that have names."))
 
+(defmethod print-object ((self name-mixin) stream)
+  (print-unreadable-object (self stream :type t :identity t)
+    (format stream "~A" (name self))))
+
 (defclass required-name-mixin (name-mixin)
   ((name
     :initform (required-argument :name)
@@ -278,6 +282,10 @@ structure."))
 
 (defmethod source ((term primitive-term))
   (value term))
+
+(defgeneric arity (term)
+  (:documentation
+   "Returns the arity of TERM."))
 
 ;;; TODO: maybe functor should not inherit from term?  Then we need to
 ;;; redefine the define-interning-make-instance macro.
@@ -756,6 +764,175 @@ or :ARG3 init-keywords is also provided."
       when-blocked    prioritized-concurrent-term
       spawn           spawn-term
       new-process     spawn-term))
+
+;;; Declaration Terms
+;;; -----------------
+
+;;; TODO: I don't think there really is a difference between
+;;; definitions and declarations.  Maybe rename the following terms to
+;;; declaration terms.  Or these terms to definition terms. --tc
+
+(defclass declaration-term (known-compound-term)
+  ()
+  (:documentation
+   "Term that declare some logical concept."))
+
+(defmethod initialize-instance :after ((self declaration-term) &key context)
+  (vector-push-extend self (declarations context)))
+
+;;; Support for incremental redefinition of declarations.  Overwrite old
+;;; declarations if the new one is equal according to DECLARE-SAME-ENTITY.
+
+;;; TODO: Not sure whether this is a good concept right now, since the precise
+;;; idea which declarations are equal turns out to be rather subtle.  Maybe
+;;; it's better to blow away all declarations for the moment.  --tc
+#+(or)
+(defgeneric declare-same-entity (lhs rhs)
+  (:documentation
+   "Methods on this generic function return true if LHS and RHS are
+   conceptually declarations for the same entity.  For unnamed declarations
+   this means that they are syntactically the same.  For named declarations
+   this means that they declare the same kind of entity with the same name,
+   not that the declarations are the same."))
+
+(defclass keywords-mixin ()
+  ((keywords :accessor keywords :initarg :keywords
+             :initform '()))
+  (:documentation
+   "Mixin that provides a KEYWORDS slot."))
+
+;;; TODO: Not sure whether this class is really needed unless we support
+;;; incremental redefinition of declarations.  (But even then it's not so
+;;; clear cut whether most declarations can be uniquely identified by their
+;;; kind and name.  E.g., funciton declarations can oddur multiple times for
+;;; the same symbol with different arities.
+;;;
+(defclass named-declaration-term (declaration-term name-mixin keywords-mixin)
+  ()
+  (:documentation
+   "Declarations that have a name that identifies them."))
+
+(defgeneric declared-sort (term)
+  (:documentation
+   "Returns the sort of TERM, or NIL if no sort for TERM is known.")
+  (:method ((term keywords-mixin))
+    (getf (keywords term) :sort)))
+
+(defclass sort-declaration-term (named-declaration-term)
+  ()
+  (:documentation
+   "The declaration of a sort."))
+
+(defmethod operator ((term sort-declaration-term))
+  'declare-sort)
+
+(defmethod declared-sort ((term sort-declaration-term))
+  (name term))
+
+(defclass subsort-declaration-term (sort-declaration-term)
+  ((supersort :accessor supersort :initarg :supersort
+              :initform t))
+  (:documentation
+   "Declares sort NAME as subsort of SUPERSORT."))
+
+(defmethod operator ((term subsort-declaration-term))
+  'declare-subsort)
+
+(defclass sorts-incompatible-declaration-term (declaration-term)
+  ((sorts :accessor sorts :initarg :sorts
+          :initform '())))
+
+(defmethod operator ((term sorts-incompatible-declaration-term))
+  'declare-sorts-incompatible)
+
+(defgeneric (setf arity) (new-arity term)
+  (:documentation
+   "Sets the arity of TERM to NEW-ARITY or raises an error, if this is not
+   possible."))
+
+(defclass constant-declaration-term (named-declaration-term)
+  ()
+  (:documentation
+   "Declares NAME as a constant symbol."))
+
+(defmethod arity ((term constant-declaration-term))
+  0)
+
+(defmethod (setf arity) (new-arity (term constant-declaration-term))
+  (when (not (zerop new-arity))
+    (error "Cannot set the arity of a constant to ~A." new-arity)))
+
+(defmethod operator ((term constant-declaration-term))
+  'declare-constant)
+
+(defclass arity-declaration-term (named-declaration-term)
+  ((arity :accessor arity :initarg :arity
+          :initform -1))
+  (:documentation
+   "Declaration of a term that has an arity."))
+
+(defclass function-declaration-term (arity-declaration-term)
+  ()
+  (:documentation
+   "Declaration of a function term."))
+
+(defmethod operator ((term function-declaration-term))
+  'declare-function)
+
+(defclass relation-declaration-term (arity-declaration-term)
+  ()
+  (:documentation
+   "Declaration of a relation term."))
+
+(defmethod operator ((term relation-declaration-term))
+  'declare-relation)
+
+(defclass ordering-declaration-term (declaration-term)
+  ((ordered-symbols :accessor ordered-symbols :initarg :ordered-symbols
+                    :initform '()))
+  (:documentation
+   "An declaration that symbols are ordered in a certain way."))
+
+(defmethod operator ((term ordering-declaration-term))
+  'declare-ordering-greaterp)
+
+;;; Logical Assertions
+;;; ------------------
+
+ (defclass logical-sentence-declaration-term (declaration-term keywords-mixin)
+  ((sentence :accessor sentence :initarg :sentence :initform nil))
+  (:documentation
+   "Representation of all logical sentences that are asserted to be true."))
+
+(defclass logical-assertion-term (logical-sentence-declaration-term)
+  ())
+
+(defmethod operator ((term logical-assertion-term))
+  'assert)
+
+(defclass logical-assumption-term (logical-sentence-declaration-term)
+  ())
+
+(defmethod operator ((term logical-assumption-term))
+  'assume)
+
+(defclass rewrite-assertion-term (logical-sentence-declaration-term)
+  ())
+
+(defmethod operator ((term rewrite-assertion-term))
+  'assert-rewrite)
+
+(defglobal *declaration-operators*
+    '(declare-sort                sort-declaration-term
+      declare-subsort             subsort-declaration-term
+      declare-sorts-incompatible  sorts-incompatible-declaration-term
+      declare-constant            constant-declaration-term
+      declare-function            function-declaration-term
+      declare-relation            relation-declaration-term
+      declare-ordering-greaterp   ordering-declaration-term
+      assert                      logical-assertion-term
+      assume                      logical-assumption-term
+      assert-rewrite              rewrite-assertion-term))
 
 ;;; Definition Terms
 ;;; ----------------

@@ -11,7 +11,7 @@
   (:use #:common-lisp #:alexandria #:iterate)
   (:nicknames #:utils)
   (:export . #.*odysseus-utilities-exports*)
-  ;; To temporarily fix the package problems for Snark evaluation.
+  ;; HACK: To temporarily fix the package problems for Snark evaluation.
   (:export #:do #:no-operation
            #:eat #:sleep #:work #:celebrate #:is-rested-p
            #:annabelle #:lenz #:matthias))

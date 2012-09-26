@@ -15,6 +15,11 @@ question mark."
     (and (> (length name) 1)
 	 (eql (char name 0) #\?))))
 
+(defun unquote (thing)
+  (if (and (consp thing) (eql (first thing) 'quote))
+      (second thing)
+      thing))
+
 ;;; Defgeneric form for PARSE-INTO-TERM-REPRESENTATION is in syntax.lisp.
 
 (defgeneric parse-arguments-for-term (term arguments compilation-context)
@@ -36,7 +41,6 @@ question mark."
         (mapcar (lambda (subexp)
                   (parse-into-term-representation subexp context))
                 arguments)))
-
 
 (defgeneric parse-binding (term binding-list context)
   (:documentation
@@ -71,7 +75,40 @@ argument list."
     (setf (bindings term) bindings)
     (call-next-method term (rest arguments) new-context)))
 
+
+(defmethod parse-arguments-for-term ((term named-declaration-term) arguments context)
+  (setf (name term) (eval (first arguments)))
+  (setf (keywords term) (mapcar 'eval (rest arguments))))
+
+(defmethod parse-arguments-for-term ((term subsort-declaration-term) arguments context)
+  (setf (name term) (eval (first arguments)))
+  (setf (supersort term) (eval (second arguments)))
+  (setf (keywords term) (mapcar 'eval (cddr arguments))))
+
+(defmethod parse-arguments-for-term
+    ((term sorts-incompatible-declaration-term) arguments context)
+  (setf (sorts term) (mapcar 'eval arguments)))
+
+(defmethod parse-arguments-for-term ((term arity-declaration-term) arguments context)
+  (setf (name term) (eval (first arguments)))
+  (setf (arity term) (eval (second arguments)))
+  (setf (keywords term) (mapcar 'eval (cddr arguments))))
+
+(defmethod parse-arguments-for-term
+    ((term ordering-declaration-term) arguments context)
+  (setf (ordered-symbols term) (mapcar 'eval arguments)))
+
+(defmethod parse-arguments-for-term
+    ((term logical-sentence-declaration-term) arguments context)
+  (setf (sentence term) (mapcar 'eval arguments))
+  (setf (keywords term) (mapcar 'eval (rest arguments))))
+
+
 (defmethod parse-into-term-representation ((exp symbol) (context compilation-context))
+  "Parse a single symbol.
+If it is NIL or NULL return an empty program term.
+If it starts with a question mark, make a variable for CONTEXT.
+If neither of these cases apply, return a primitive term."
   (cond ((or (eql exp 'nil) (eql exp 'null))
 	 (make-instance 'empty-program-term :context context :source exp))
 	((starts-with-question-mark-p exp)
@@ -81,13 +118,16 @@ argument list."
                         :value exp :context context :source exp))))
 
 (defmethod parse-into-term-representation ((exp number) (context compilation-context))
+  "Return a number term with value EXP."
   (make-instance 'number-term :value exp :context context))
 
 (defmethod parse-into-term-representation ((exp string) (context compilation-context))
+  "Return a primitive term with value EXP."
   (make-instance 'primitive-term :value exp :context context))
 
 (defmethod parse-into-term-representation
     ((exp snark::variable) (context compilation-context))
+  "Return a variable term corresponding to EXP in the current context."
   (parse-into-term-representation
    (intern (format nil "?SV~A.~A"
                    (snark::variable-number exp)
@@ -95,6 +135,13 @@ argument list."
    context))
 
 (defmethod parse-into-term-representation ((exp cons) (context compilation-context))
+  "Return a TERM-instance for EXP in CONTEXT.
+If the operator of EXP has a known term type make an instance of that type.
+Otherwise, if the operator is a primitive action, then return an instance of
+that action's class.
+Otherwise, if the operator is a fluent return an instance of the fluent's
+class.
+Otherwise return an instance of UNKNOWN-GENERAL-APPLICATION-TERM."
   (let* ((operator (first exp))
 	 (known-type (term-type-for-operator operator context nil))
          (term (cond (known-type

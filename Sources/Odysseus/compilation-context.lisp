@@ -7,7 +7,6 @@
 
 (in-package #:odysseus-syntax)
 
-
 ;;; Forward Declarations from the Parser
 ;;; ====================================
 
@@ -31,6 +30,16 @@
   ()
   (:documentation
    "Context needed by the compiler."))
+
+(defgeneric declarations (context)
+  (:documentation
+   "Returns an extensible sequence of all logical declarations (sort
+declations, constant and function symbol declarations, logical assertions,
+etc. for this context."))
+
+(defgeneric (setf declarations) (new-declarations context)
+  (:documentation
+   "Sets the logical declarations for CONTEXT to NEW-DECLARATIONS."))
 
 (defgeneric lookup-functor (name arity context &optional create?)
   (:documentation

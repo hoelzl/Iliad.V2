@@ -391,3 +391,86 @@
       (5am:is (typep rf 'robot-position-term))
       (5am:is (typep rf 'known-general-application-term))
       (5am:is (= 1 (length (arguments rf)))))))
+
+(5am:test (test-parse-into-term-representation-18
+           :compile-at :definition-time)
+  (let* ((cc (make-instance 'compilation-unit))
+         (term (parse-into-term-representation '(declare-sort 'situation) cc)))
+    (5am:is-true (typep term 'sort-declaration-term))
+    (5am:is (eql 'situation (name term)))
+    (5am:is (eql 'situation (declared-sort term)))))
+
+(5am:test (test-parse-into-term-representation-19
+           :compile-at :definition-time)
+  (let* ((cc (make-instance 'compilation-unit))
+         (term (parse-into-term-representation
+                '(declare-subsort 'work-action 'action) cc)))
+    (5am:is-true (typep term 'sort-declaration-term))
+    (5am:is (eql 'work-action (name term)))
+    (5am:is (eql 'work-action (declared-sort term)))
+    (5am:is (eql 'action (supersort term)))))
+
+(5am:test (test-parse-into-term-representation-20
+           :compile-at :definition-time)
+  (let* ((cc (make-instance 'compilation-unit))
+         (term (parse-into-term-representation
+                '(declare-sorts-incompatible 'situation 'action 'object) cc)))
+    (5am:is-true (typep term 'sorts-incompatible-declaration-term))
+    (5am:is (equalp '(situation action object) (sorts term)))))
+
+(5am:test (test-parse-into-term-representation-21
+           :compile-at :definition-time)
+  (let* ((cc (make-instance 'compilation-unit))
+         (term (parse-into-term-representation
+                '(declare-constant 's0 :sort 'situation) cc)))
+    (5am:is-true (typep term 'constant-declaration-term))
+    (5am:is (eql 's0 (name term)))
+    (5am:is (eql 'situation (declared-sort term)))))
+
+(5am:test (test-parse-into-term-representation-22
+           :compile-at :definition-time)
+  (let* ((cc (make-instance 'compilation-unit))
+         (term (parse-into-term-representation
+                '(declare-function 'do 2
+		    :sort '(situation action situation)
+		    :injective t)
+                cc)))
+    (5am:is-true (typep term 'function-declaration-term))
+    (5am:is (eql 'do (name term)))
+    (5am:is (equalp '(situation action situation) (declared-sort term)))))
+
+(5am:test (test-parse-into-term-representation-23
+           :compile-at :definition-time)
+  (let* ((cc (make-instance 'compilation-unit))
+         (term (parse-into-term-representation
+                '(declare-relation 'is-rested-p 2
+                  :sort '(person situation))
+                cc)))
+    (5am:is-true (typep term 'relation-declaration-term))
+    (5am:is (eql 'is-rested-p (name term)))
+    (5am:is (equalp '(person situation) (declared-sort term)))))
+
+(5am:test (test-parse-into-term-representation-24
+           :compile-at :definition-time)
+  (let* ((cc (make-instance 'compilation-unit))
+         (term (parse-into-term-representation
+                '(declare-ordering-greaterp 'do 'work 'sleep
+                                            'annabelle 'lenz 'matthias)
+                cc)))
+    (5am:is-true (typep term 'ordering-declaration-term))
+    (5am:is (equalp '(do work sleep annabelle lenz matthias)
+                    (ordered-symbols term)))))
+
+
+(5am:test (test-parse-into-term-representation-25
+           :compile-at :definition-time)
+  (let* ((cc (make-instance 'compilation-unit))
+         (term (parse-into-term-representation
+                '(assert '(is-rested-p annabelle s0)
+                 :name :annabelle-is-rested-in-s0)
+                cc)))
+    (5am:is-true (typep term 'logical-sentence-declaration-term))
+    (5am:is-true (typep term 'logical-assertion-term))
+    (5am:is (equalp '(:name :annabelle-is-rested-in-s0)
+                    (keywords term)))))
+

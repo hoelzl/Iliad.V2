@@ -38,7 +38,6 @@
   (declare-constant 'odysseus-situation::s0 :sort 'situation :constructor nil)
   (declare-function 'do 2
 		    :sort '(situation action situation)
-		    :constructor nil
 		    :injective t)
   #+(or)
   (assert '(snark::forall ((s :sort situation)

@@ -14,7 +14,10 @@
 ;;; A compilation unit is a long-lasting context.
 
 (defvar *default-known-operators*
-  (append *logical-operators* *programming-operators* *definition-operators*))
+  (append *logical-operators*
+          *programming-operators*
+          *declaration-operators*
+          *definition-operators*))
 
 #+(or)
 (unless *default-known-operators*
@@ -34,7 +37,11 @@
   *default-primitive-action-names*)
 
 (defclass compilation-unit (compilation-context unique-terms-mixin)
-  ((known-operators
+  ((declarations 
+    :accessor declarations :initarg :declarations
+    :initform (make-array '(10) :adjustable t :fill-pointer 0)
+    :documentation "Logical declarations for this compilation unit.")
+   (known-operators
     :accessor known-operators :initarg :known-operators
     :initform (default-known-operators)
     :documentation "Special operators for this compilation unit.")
@@ -165,6 +172,12 @@
 
 (defmethod (setf lookup-functor) (new-value name arity (context local-context))
   (setf (lookup-functor name arity (outer-context context)) new-value))
+
+(defmethod declarations ((context local-context))
+  (declarations (outer-context context)))
+
+(defmethod (setf declarations) (new-declaratiions (context local-context))
+  (setf (declarations (outer-context context)) new-declaratiions))
 
 (defmethod known-operators ((context local-context))
   (known-operators (outer-context context)))

@@ -46,6 +46,7 @@
       #:known-term #:is-known-term-p
       
       #:compilation-context
+      #:declarations
       #:lookup-functor #:lookup-variable #:lookup-number
       #:known-operators #:default-known-operators
       #:primitive-actions #:default-primitive-action-names
@@ -103,6 +104,26 @@
       #:concurrent-term
       #:prioritized-concurrent-term
       #:spawn-term
+
+      #:declaration-term
+      #:keywords-mixin #:keywords
+      #:named-declaration-term
+      #:sort-declaration-term
+      #:subsort-declaration-term #:supersort
+      #:declared-sort
+      #:sorts-incompatible-declaration-term #:sorts
+      #:arity
+      #:constant-declaration-term
+      #:arity-declaration-term
+      #:function-declaration-term
+      #:relation-declaration-term
+      #:ordering-declaration-term #:ordered-symbols
+
+      #:logical-sentence-declaration-term
+      #:sentence
+      #:logical-assertion-term
+      #:logical-assumption-term
+      #:rewrite-assertion-term
       
       #:definition-term
       #:primitive-action-definition-term
@@ -131,6 +152,15 @@
       #:concurrently #:in-parallel
       #:prioritized #:when-blocked
       #:spawn #:new-process
+
+      #:declare-sort #:declare-subsort
+      #:declare-sorts-incompatible
+      #:declare-ordering-greaterp
+      #:declare-constant
+      #:declare-function
+      #:declare-relation
+      #:assert #:assert-rewrite
+      #:assume
       
       #:poss
       
@@ -149,6 +179,7 @@
   
   (defvar *odysseus-parser-exports*
     '(#:starts-with-question-mark-p
+      #:unquote
       #:parse-arguments-for-term
       #:parse-binding
       #:parse-into-term-representation))
