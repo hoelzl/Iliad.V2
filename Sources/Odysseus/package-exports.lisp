@@ -53,15 +53,17 @@
       
       #:compilation-context
       #:declarations
+      #:unique-terms #:add-unique-term
       #:lookup-functor #:lookup-variable #:lookup-number
       #:known-operators #:default-known-operators
       #:primitive-actions #:default-primitive-action-names
       #:fluents
       #:the-empty-program-term #:the-no-operation-term
       #:context-mixin #:context
+      #:singleton-terms-mixin
       #:unique-terms-mixin
       #:compilation-unit
-      #:local-context #:outer-context #:local-variables
+      #:local-context #:enclosing-context #:local-variables
       
       #:set-up-snark
       #:process-declaration-for-snark))

@@ -8,6 +8,45 @@
 (in-package #:odysseus-syntax)
 
 
+;;; Singelton Terms Mixin
+;;; ======================
+
+(defclass singleton-terms-mixin ()
+  ((the-empty-program-term
+    :initform nil :initarg :the-empty-program-term
+    :documentation "Storage for the empty program term.")
+   (the-no-operation-term
+    :initform nil :initarg :the-no-operation-term
+    :documentation "Storage for the no-operation term."))
+  (:documentation
+   "A mixin that provides storage and default implementation of getters for
+   singleton terms of a context."))
+
+(defmethod the-empty-program-term ((self singleton-terms-mixin))
+  "Return the empty program term.  Cache the value in SELF."
+  (or (slot-value self 'the-empty-program-term)
+      (setf (slot-value self 'the-empty-program-term)
+            (make-instance 'empty-program-term :context self))))
+
+(defmethod the-no-operation-term ((self singleton-terms-mixin))
+  "Return the no-operation term.  Cache the value in SELF."
+  (or (slot-value self 'the-no-operation-term)
+      (set (slot-value self 'the-no-operation-term)
+           (make-instance 'no-operation-term :context self))))
+
+
+;;; Unique Terms Mixin
+;;; ==================
+
+(defclass unique-terms-mixin ()
+  ((unique-terms
+    :accessor unique-terms :initarg :unique-terms
+    :initform (make-array '(16) :element-type 'term :adjustable t :fill-pointer 0)))
+  (:documentation
+   "A mixin that provides storage and methods for obtaining the unique terms
+   of a context."))
+
+
 ;;; Compilation units
 ;;; =================
 
@@ -36,7 +75,7 @@
 (defun default-primitive-action-names ()
   *default-primitive-action-names*)
 
-(defclass compilation-unit (compilation-context unique-terms-mixin)
+(defclass compilation-unit (compilation-context singleton-terms-mixin)
   ((declarations 
     :accessor declarations :initarg :declarations
     :initform (make-array '(10) :adjustable t :fill-pointer 0)
@@ -131,8 +170,8 @@
 ;;; =============
 
 (defclass local-context (compilation-context)
-  ((outer-context :accessor outer-context :initarg :outer-context
-                  :initform (required-argument :outer-context))
+  ((enclosing-context :accessor enclosing-context :initarg :enclosing-context
+                  :initform (required-argument :enclosing-context))
    (local-variables :accessor local-variables :initarg :local-variables
                     :initform '()))
   (:documentation
@@ -142,8 +181,8 @@
   (let ((local-binding (assoc name (local-variables context))))
     (if local-binding
         (cdr local-binding)
-        (let* ((outer-context (outer-context context))
-               (outer-var (lookup-variable name outer-context nil)))
+        (let* ((enclosing-context (enclosing-context context))
+               (outer-var (lookup-variable name enclosing-context nil)))
           (or outer-var
               (if create?
                   (let ((var (make-variable-term name context :intern nil)))
@@ -160,48 +199,48 @@
            new-value))))
 
 (defmethod lookup-number (value (context local-context) &optional (create? t))
-  (lookup-number value (outer-context context) create?))
+  (lookup-number value (enclosing-context context) create?))
 
 (defmethod (setf lookup-number) (new-value value (context local-context))
   (assert (= (value new-value) value) (new-value)
           "Trying to set number ~A to value ~A." value (value new-value))
-  (setf (lookup-number value (outer-context context)) new-value))
+  (setf (lookup-number value (enclosing-context context)) new-value))
 
 (defmethod lookup-functor (name arity (context local-context) &optional (create? t))
-  (lookup-functor name arity (outer-context context) create?))
+  (lookup-functor name arity (enclosing-context context) create?))
 
 (defmethod (setf lookup-functor) (new-value name arity (context local-context))
-  (setf (lookup-functor name arity (outer-context context)) new-value))
+  (setf (lookup-functor name arity (enclosing-context context)) new-value))
 
 (defmethod declarations ((context local-context))
-  (declarations (outer-context context)))
+  (declarations (enclosing-context context)))
 
 (defmethod (setf declarations) (new-declaratiions (context local-context))
-  (setf (declarations (outer-context context)) new-declaratiions))
+  (setf (declarations (enclosing-context context)) new-declaratiions))
 
 (defmethod known-operators ((context local-context))
-  (known-operators (outer-context context)))
+  (known-operators (enclosing-context context)))
 
 (defmethod (setf known-operators) (new-value (context local-context))
-  (setf (known-operators (outer-context context)) new-value))
+  (setf (known-operators (enclosing-context context)) new-value))
 
 (defmethod primitive-actions ((context local-context))
-  (primitive-actions (outer-context context)))
+  (primitive-actions (enclosing-context context)))
 
 (defmethod (setf primitive-actions) ((new-value list) (context local-context))
-  (setf (primitive-actions (outer-context context)) new-value))
+  (setf (primitive-actions (enclosing-context context)) new-value))
 
 (defmethod fluents ((context local-context))
-  (fluents (outer-context context)))
+  (fluents (enclosing-context context)))
 
 (defmethod (setf fluents) (new-value (context local-context))
-  (setf (fluents (outer-context context)) new-value))
+  (setf (fluents (enclosing-context context)) new-value))
 
 (defmethod the-empty-program-term ((context local-context))
-  (the-empty-program-term (outer-context context)))
+  (the-empty-program-term (enclosing-context context)))
 
 (defmethod the-no-operation-term ((context local-context))
-  (the-no-operation-term (outer-context context)))
+  (the-no-operation-term (enclosing-context context)))
 
 
 ;;; Some utilities for interactive exploration

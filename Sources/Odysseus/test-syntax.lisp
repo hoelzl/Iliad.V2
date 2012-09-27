@@ -57,7 +57,7 @@
            :compile-at :definition-time)
   (let* ((cu (make-instance 'compilation-unit))
          (vars (syntax::variable-hash-table cu))
-         (lc (make-instance 'local-context :outer-context cu)))
+         (lc (make-instance 'local-context :enclosing-context cu)))
     (5am:is (eql (local-variables lc) '()))
     (5am:is (eql (lookup-variable 'foo lc nil) nil))
     (5am:is (eql (local-variables lc) '()))
@@ -128,7 +128,7 @@
 (5am:test (test-local-lookup-for-number
            :compile-at :definition-time)
   (let* ((cu (make-instance 'compilation-unit))
-         (lc (make-instance 'local-context :outer-context cu)))
+         (lc (make-instance 'local-context :enclosing-context cu)))
     (5am:is (eql (lookup-number 123 lc nil) nil))
     (let ((n234 (lookup-number 234 lc t))
           (n345 (make-instance
@@ -181,7 +181,7 @@
            :compile-at :definition-time)
   (let* ((cu (make-instance 'compilation-unit))
          (funs (syntax::functor-hash-table cu))
-         (lc (make-instance 'local-context :outer-context cu)))
+         (lc (make-instance 'local-context :enclosing-context cu)))
     (5am:is (= (hash-table-count funs) 0))
     (5am:is (eql (lookup-functor 'foo 2 lc nil) nil))
     (let ((foo/2 (lookup-functor 'foo 2 lc t))

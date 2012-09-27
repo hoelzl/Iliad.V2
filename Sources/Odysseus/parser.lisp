@@ -113,7 +113,7 @@ accepting all keyword arguments without parsing any of them."
   "Parse the binding list and then call the next method on the rest of the
 argument list."
   (let* ((binding-list (ensure-list (first arguments)))
-         (new-context (make-instance 'local-context :outer-context context))
+         (new-context (make-instance 'local-context :enclosing-context context))
          (bindings (mapcar (lambda (binding)
                              (parse-binding binding term new-context))
                            binding-list)))

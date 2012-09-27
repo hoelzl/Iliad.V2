@@ -16,7 +16,7 @@
 	       (:file "utilities")
 	       (:file "macros")
 	       (:file "compilation-context")
-	       (:file "syntax")
+	       (:file "terms")
 	       (:file "compilation-unit")
 	       (:file "situation")
 	       (:file "term-operations")
