@@ -157,22 +157,47 @@ primitive-action definition for OPERATOR in CONTEXT.")
           (make-instance 'primitive-action-definition
                          :operator operator :class class-name :context context))))
 
-(defmacro define-primitive-action (operator signature
-                                   &key (class-name (symbolicate operator '#:-term))
-                                        precondition)
-  `(progn
-     (defclass ,class-name (primitive-action-term)
-       ())
-     (defmethod operator ((term ,class-name))
-       (declare (ignore term))
-       ',operator)
-     (defmethod declare-primitive-action
-       ((operator (eql ',operator)) (context compilation-context)
-        &optional (class-name ',class-name))
-       (setf (primitive-action-definition operator context)
-             (make-instance 'primitive-action-definition
-                            :operator ',operator
-                            :signature ,signature
-                            :class class-name
-                            :precondition ,precondition
-                            :context context)))))
+(defun define-primitive-action (operator signature
+                                &key (class-name  (symbolicate operator '#:-term))
+                                     precondition)
+  (c2mop:ensure-class class-name :direct-superclasses '(primitive-action-term))
+  (define-method 'operator
+    :specializers (list (find-class class-name))
+    :lambda-list '(term)
+    :body `(lambda (term)
+             (declare (ignore term))
+             ',operator))
+  (define-method 'declare-primitive-action
+    :specializers (list (c2mop:intern-eql-specializer operator)
+                        (find-class 'compilation-context))
+    :lambda-list `(operator context &optional (class-name ',class-name))
+    :body `(lambda (operator context &optional (class-name ',class-name))
+             (setf (primitive-action-definition operator context)
+                   (make-instance 'primitive-action-definition
+                     :operator ',operator
+                     :signature ',signature
+                     :class class-name
+                     :precondition ',precondition
+                     :context context)))))
+
+
+;;; Interaction with Snark.
+;;; ======================
+
+(defgeneric process-declaration-for-snark (declaration)
+  (:documentation
+   "Process DECLARATION so that the declared entity exists in Snark's
+   theory.")
+  (:method (declaration)
+    ;; TODO: Turn this into an error once we have completed the
+    ;; implementation.
+    (format *error-output* "~&Don't know how to process declaration ~W.~%"
+            declaration)))
+
+(defgeneric set-up-snark (compilation-context)
+  (:documentation
+   "Set up Snark to prove things in COMPILATION-CONTEXT.")
+  (:method ((context compilation-context))
+    (iterate (for declaration in-sequence (declarations context))
+      (process-declaration-for-snark declaration))
+    :snark-setup-completed))

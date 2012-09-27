@@ -22,6 +22,8 @@
   ;; by other programs.
   (:use #:common-lisp #:alexandria #:iterate
 	#:odysseus-utilities)
+  (:import-from #:snark-lisp
+                #:forall #:exists #:not #:iff)
   (:nicknames #:syntax)
   (:export . #.*odysseus-context-exports*)
   (:export . #.*odysseus-term-exports*)
@@ -62,7 +64,8 @@
   (:export . #.*odysseus-parser-exports*))
 
 (defpackage #:odysseus-snark
-  (:use #:common-lisp #:snark #:odysseus-utilities)
+  (:use #:common-lisp #:snark
+        #:odysseus-utilities #:odysseus-context)
   (:nicknames)
   (:export . #.*odysseus-snark-exports*))
 
@@ -82,6 +85,7 @@
         #:odysseus-syntax
         #:odysseus-situation
         #:odysseus-parser
+        #:odysseus-snark
         #:odysseus-interpreter)
   (:export . #.*odysseus-utilities-exports*)
   (:export . #.*odysseus-context-exports*)

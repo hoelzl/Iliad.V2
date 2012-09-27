@@ -15,10 +15,55 @@ question mark."
     (and (> (length name) 1)
 	 (eql (char name 0) #\?))))
 
-(defun unquote (thing)
-  (if (and (consp thing) (eql (first thing) 'quote))
-      (second thing)
-      thing))
+;;; Handling of Declarations
+;;; ========================
+
+(defgeneric process-declaration-for-parsing (declaration context)
+  (:documentation
+   "Process a declaration so that the parser can use it for processing
+   the rest of the program.")
+
+  (:method ((term term) interpreter)
+    (declare (ignore term interpreter))
+    :do-nothing)
+  ;; TODO: We might want to do something along the following lines.  For now
+  ;; we use a simple implementation that always calls DEFINE-PRIMITIVE-ACTION.
+  #+(or)
+  (:method ((declaration primitive-action-declaration-term) context)
+    (with-slots (name) declaration
+      (let ((class (find-class name)))
+        (if class
+            (cond ((not (typep class 'primitive-action-definition))
+                   (cerror "Redefine the class."
+                           'invalid-class-for-action-theory-element
+                           :expected-class 'primitive-action-definition
+                           :current-class class)
+                   (define-primitive-action (name declaration)
+                       (declared-sort declaration)
+                     :precondition (precondition declaration)))
+                  ;; TODO: Handle case of signature changes.
+                  (t
+                   (define-primitive-action (name declaration)
+                       (declared-sort declaration)
+                     :precondition (precondition declaration))))))))
+  (:method ((declaration primitive-action-declaration-term) context)
+    (apply #'define-primitive-action (name declaration)
+           (signature declaration)
+           (keywords declaration))
+    (declare-primitive-action (name declaration) context))
+
+  (:method ((declaration functional-fluent-declaration-term) context)
+    (apply #'define-functional-fluent (name declaration)
+           (signature declaration)
+           (keywords declaration))
+    (declare-functional-fluent (name declaration) context))
+
+  (:method ((declaration relational-fluent-declaration-term) context)
+    (apply #'define-relational-fluent (name declaration)
+           (signature declaration)
+           (keywords declaration))
+    (declare-relational-fluent (name declaration) context)))
+
 
 ;;; Defgeneric form for PARSE-INTO-TERM-REPRESENTATION is in syntax.lisp.
 
@@ -75,34 +120,57 @@ argument list."
     (setf (bindings term) bindings)
     (call-next-method term (rest arguments) new-context)))
 
+(defmethod parse-arguments-for-term :after ((term declaration-term) arguments context)
+  "Add TERM to the declarations of CONTEXT.  This has to happen after the
+arguments are passed, otherwise the name of TERM will not be set."
+  (declare (ignore arguments))
+  (vector-push-extend term (declarations context))
+  (process-declaration-for-parsing term context))
 
+
+;; TODO: We currently simply unquote arguments that should actually be
+;; evaluated by the interpreter.  This is so that we don't have to fix all
+;; examples when the interpreter is complete enough.
 (defmethod parse-arguments-for-term ((term named-declaration-term) arguments context)
-  (setf (name term) (eval (first arguments)))
-  (setf (keywords term) (mapcar 'eval (rest arguments))))
+  (setf (name term) (unquote (first arguments)))
+  (setf (keywords term) (mapcar 'unquote (rest arguments))))
 
 (defmethod parse-arguments-for-term ((term subsort-declaration-term) arguments context)
-  (setf (name term) (eval (first arguments)))
-  (setf (supersort term) (eval (second arguments)))
-  (setf (keywords term) (mapcar 'eval (cddr arguments))))
+  (setf (name term) (unquote (first arguments)))
+  (setf (supersort term) (unquote (second arguments)))
+  (setf (keywords term) (mapcar 'unquote (cddr arguments))))
 
 (defmethod parse-arguments-for-term
     ((term sorts-incompatible-declaration-term) arguments context)
-  (setf (sorts term) (mapcar 'eval arguments)))
+  (setf (sorts term) (mapcar 'unquote arguments)))
 
 (defmethod parse-arguments-for-term ((term arity-declaration-term) arguments context)
-  (setf (name term) (eval (first arguments)))
-  (setf (arity term) (eval (second arguments)))
-  (setf (keywords term) (mapcar 'eval (cddr arguments))))
+  (setf (name term) (unquote (first arguments)))
+  (setf (arity term) (unquote (second arguments)))
+  (setf (keywords term) (mapcar 'unquote (cddr arguments))))
+
+(defmethod parse-arguments-for-term ((term signature-declaration-term) arguments context)
+  (setf (name term) (unquote (first arguments)))
+  (setf (signature term) (unquote (second arguments)))
+  (setf (keywords term) (mapcar 'unquote (cddr arguments))))
 
 (defmethod parse-arguments-for-term
     ((term ordering-declaration-term) arguments context)
-  (setf (ordered-symbols term) (mapcar 'eval arguments)))
+  (setf (ordered-symbols term) (mapcar 'unquote arguments)))
 
 (defmethod parse-arguments-for-term
     ((term logical-sentence-declaration-term) arguments context)
-  (setf (sentence term) (mapcar 'eval arguments))
-  (setf (keywords term) (mapcar 'eval (rest arguments))))
+  (setf (sentence term) (unquote (first arguments)))
+  (setf (keywords term) (mapcar 'unquote (rest arguments))))
 
+
+(defmethod parse-into-term-representation ((term term) (context compilation-context))
+  "When re-parsing an already parsed term, return it unchanged.  But only if
+the new context equals the one in which it was originally parsed."
+  (assert (eql (context term) context) ()
+          "Cannot parse term ~W in context ~W."
+          term context)
+  term)
 
 (defmethod parse-into-term-representation ((exp symbol) (context compilation-context))
   "Parse a single symbol.

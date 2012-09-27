@@ -96,24 +96,29 @@ fluent definition for OPERATOR in CONTEXT.")
           (make-instance 'relational-fluent-definition
                          :operator operator :class class-name :context context))))
 
-(defmacro define-relational-fluent (operator
-                                    &key (class-name (symbolicate operator '#:-term))
-                                         successor-state)
-  `(progn
-     (defclass ,class-name (known-general-application-term)
-       ())
-     (defmethod operator ((term ,class-name))
-       (declare (ignore term))
-       ',operator)
-     (defmethod declare-relational-fluent
-       ((operator (eql ',operator)) (context compilation-context)
-        &optional (class-name ',class-name))
-       (setf (fluent-definition operator context)
-             (make-instance 'relational-fluent-definition
-                            :operator ',operator
-                            :class class-name
-                            :successor-state ',successor-state
-                            :context context)))))
+(defun define-relational-fluent (operator signature
+                                 &key (class-name (symbolicate operator '#:-term))
+                                      successor-state)
+  (c2mop:ensure-class class-name
+                      :direct-superclasses '(known-general-application-term))
+  (define-method 'operator
+    :specializers (list (find-class class-name))
+    :lambda-list '(term)
+    :body `(lambda (term)
+             (declare (ignore term))
+             ',operator))
+  (define-method 'declare-primitive-action
+    :specializers (list (c2mop:intern-eql-specializer operator)
+                        (find-class 'compilation-context))
+    :lambda-list `(operator context &optional (class-name ',class-name))
+    :body `(lambda (operator context &optional (class-name ',class-name))
+             (setf (fluent-definition operator context)
+                   (make-instance 'relational-fluent-definition
+                     :operator ',operator
+                     :signature ',signature
+                     :class class-name
+                     :successor-state ',successor-state
+                     :context context)))))
 
 
 (defclass functional-fluent-definition (fluent-definition)
@@ -130,24 +135,29 @@ fluent definition for OPERATOR in CONTEXT.")
           (make-instance 'functional-fluent-definition
                          :operator operator :class class-name :context context))))
 
-(defmacro define-functional-fluent (operator
-                                    &key (class-name (symbolicate operator '#:-term))
-                                         successor-state)
-  `(progn
-     (defclass ,class-name (known-general-application-term)
-       ())
-     (defmethod operator ((term ,class-name))
-       (declare (ignore term))
-       ',operator)
-     (defmethod declare-functional-fluent
-       ((operator (eql ',operator)) (context compilation-context)
-        &optional (class-name ',class-name))
-       (setf (fluent-definition operator context)
-             (make-instance 'functional-fluent-definition
-                            :operator ',operator
-                            :class class-name
-                            :successor-state ',successor-state
-                            :context context)))))
+(defun define-functional-fluent (operator signature
+                                 &key (class-name (symbolicate operator '#:-term))
+                                      successor-state)
+  (c2mop:ensure-class class-name
+                      :direct-superclasses '(known-general-application-term))
+  (define-method 'operator
+    :specializers (list (find-class class-name))
+    :lambda-list '(term)
+    :body `(lambda (term)
+             (declare (ignore term))
+             ',operator))
+  (define-method 'declare-primitive-action
+    :specializers (list (c2mop:intern-eql-specializer operator)
+                        (find-class 'compilation-context))
+    :lambda-list `(operator context &optional (class-name ',class-name))
+    :body `(lambda (operator context &optional (class-name ',class-name))
+             (setf (fluent-definition operator context)
+                   (make-instance 'functional-fluent-definition
+                     :operator ',operator
+                     :signature ',signature
+                     :class class-name
+                     :successor-state ',successor-state
+                     :context context)))))
 
 ;;; Names
 ;;; =====
@@ -286,6 +296,11 @@ structure."))
 (defgeneric arity (term)
   (:documentation
    "Returns the arity of TERM."))
+
+(defgeneric (setf arity) (new-arity term)
+  (:documentation
+   "Sets the arity of TERM to NEW-ARITY or raises an error, if this is not
+   possible."))
 
 ;;; TODO: maybe functor should not inherit from term?  Then we need to
 ;;; redefine the define-interning-make-instance macro.
@@ -596,16 +611,16 @@ or :ARG3 init-keywords is also provided."
       |;|            disjunction-term
       not            negation-term
       |~|            negation-term
+      implies        implication-term
       ->             implication-term
       =>             implication-term
-      implies        implication-term
+      implied-by     reverse-implication-term
       <-             reverse-implication-term
       <=             reverse-implication-term
-      implied-by     reverse-implication-term
       is-implied-by  reverse-implication-term
+      iff            equivalence-term
       <->            equivalence-term
       <=>            equivalence-term
-      iff            equivalence-term
       equiv          equivalence-term
       equivalent     equivalence-term
       is-equivalent  equivalence-term
@@ -613,8 +628,8 @@ or :ARG3 init-keywords is also provided."
       foreach        universal-quantification-term
       each           universal-quantification-term
       forall         universal-quantification-term
-      exist          existential-quantification-term
-      exists         existential-quantification-term))
+      exists          existential-quantification-term
+      exist         existential-quantification-term))
 
 ;;; Programming-Language Terms
 ;;; --------------------------
@@ -640,7 +655,7 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "A term describing the execution of a primitive action."))
 
-(define-primitive-action no-operation '())
+(define-primitive-action 'no-operation '())
 
 (defclass test-term (unary-term)
   ((argument :accessor test :initarg :test))
@@ -737,33 +752,38 @@ or :ARG3 init-keywords is also provided."
   'spawn)
 
 (defglobal *programming-operators*
-    '(?               test-term
-      test            test-term
-      holds           test-term
-      holds?          test-term
-      seq             sequence-term
-      sequentially    sequence-term
-      begin           sequence-term
-      progn           sequence-term
-      one-of          action-choice-term
-      choose          action-choice-term
-      choose-action   action-choice-term
-      pick            argument-choice-term
-      pick-argument   argument-choice-term
-      choose-argument argument-choice-term
-      repeat          iteration-term
-      loop            iteration-term
-      iterate         iteration-term
-      if              conditional-term
-      while           while-loop-term
-      search          search-term
-      offline         search-term
-      concurrently    concurrent-term
-      in-parallel     concurrent-term
-      prioritized     prioritized-concurrent-term
-      when-blocked    prioritized-concurrent-term
-      spawn           spawn-term
-      new-process     spawn-term))
+    '(?                  test-term
+      test               test-term
+      holds              test-term
+      holds?             test-term
+      seq                sequence-term
+      sequentially       sequence-term
+      begin              sequence-term
+      progn              sequence-term
+      one-of             action-choice-term
+      choose             action-choice-term
+      choose-action      action-choice-term
+      pick               argument-choice-term
+      pick-argument      argument-choice-term
+      choose-argument    argument-choice-term
+      repeat             iteration-term
+      loop               iteration-term
+      iterate            iteration-term
+      if                 conditional-term
+      while              while-loop-term
+      search             search-term
+      offline            search-term
+      concurrently       concurrent-term
+      in-parallel        concurrent-term
+      prioritized        prioritized-concurrent-term
+      when-blocked       prioritized-concurrent-term
+      spawn              spawn-term
+      new-process        spawn-term
+      define-procedure   procedure-definition-term
+      defprocedure       procedure-definition-term
+      defproc            procedure-definition-term
+      procedure          procedure-definition-term
+      proc               procedure-definition-term))
 
 ;;; Declaration Terms
 ;;; -----------------
@@ -777,6 +797,9 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "Term that declare some logical concept."))
 
+;;; Don't push declarations to the context when defining them; do so
+;;; while executing the program.
+#+(or)
 (defmethod initialize-instance :after ((self declaration-term) &key context)
   (vector-push-extend self (declarations context)))
 
@@ -801,6 +824,18 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "Mixin that provides a KEYWORDS slot."))
 
+(defgeneric declared-sort (term)
+  (:documentation
+   "Returns the sort of TERM, or NIL if no sort for TERM is known.")
+  (:method ((term keywords-mixin))
+    (getf (keywords term) :sort)))
+
+(defgeneric successor-state (term)
+  (:documentation
+   "Returns the successor state axiom of TERM, or NIL if none exists.")
+  (:method ((term keywords-mixin))
+    (getf (keywords term) :successor-state)))
+
 ;;; TODO: Not sure whether this class is really needed unless we support
 ;;; incremental redefinition of declarations.  (But even then it's not so
 ;;; clear cut whether most declarations can be uniquely identified by their
@@ -811,12 +846,6 @@ or :ARG3 init-keywords is also provided."
   ()
   (:documentation
    "Declarations that have a name that identifies them."))
-
-(defgeneric declared-sort (term)
-  (:documentation
-   "Returns the sort of TERM, or NIL if no sort for TERM is known.")
-  (:method ((term keywords-mixin))
-    (getf (keywords term) :sort)))
 
 (defclass sort-declaration-term (named-declaration-term)
   ()
@@ -845,10 +874,39 @@ or :ARG3 init-keywords is also provided."
 (defmethod operator ((term sorts-incompatible-declaration-term))
   'declare-sorts-incompatible)
 
-(defgeneric (setf arity) (new-arity term)
+(defclass signature-declaration-term (named-declaration-term)
+  ((signature :accessor signature :initarg :signature :initform '())))
+
+(defmethod declared-sort ((term signature-declaration-term))
+  (signature term))
+
+(defclass primitive-action-declaration-term (signature-declaration-term)
+  ((precondition :accessor precondition :initarg :precondition
+                 :initform nil))
   (:documentation
-   "Sets the arity of TERM to NEW-ARITY or raises an error, if this is not
-   possible."))
+   "Term describing the declaration of a primitive action."))
+
+(defmethod operator ((term primitive-action-declaration-term))
+  (declare (ignore term))
+  'declare-primitive-action)
+
+(defclass functional-fluent-declaration-term (signature-declaration-term)
+  ()
+  (:documentation
+   "Term describing the declaration of a functional fluent."))
+
+(defmethod operator ((term functional-fluent-declaration-term))
+  (declare (ignore term))
+  'declare-functional-fluent)
+
+(defclass relational-fluent-declaration-term (signature-declaration-term)
+  ()
+  (:documentation
+   "Term describing the declaration of a relational fluent."))
+
+(defmethod operator ((term relational-fluent-declaration-term))
+  (declare (ignore term))
+  'declare-relational-fluent)
 
 (defclass constant-declaration-term (named-declaration-term)
   ()
@@ -923,13 +981,19 @@ or :ARG3 init-keywords is also provided."
   'assert-rewrite)
 
 (defglobal *declaration-operators*
-    '(declare-sort                sort-declaration-term
+    '(declare-primitive-action    primitive-action-declaration-term
+      defprimitive                primitive-action-declaration-term
+      declare-functional-fluent   functional-fluent-declaration-term
+      declare-relational-fluent   relational-fluent-declaration-term
+
+      declare-sort                sort-declaration-term
       declare-subsort             subsort-declaration-term
       declare-sorts-incompatible  sorts-incompatible-declaration-term
       declare-constant            constant-declaration-term
       declare-function            function-declaration-term
-      declare-relation            relation-declaration-term
+      declare-relation            relation-declaration-term      
       declare-ordering-greaterp   ordering-declaration-term
+
       assert                      logical-assertion-term
       assume                      logical-assumption-term
       assert-rewrite              rewrite-assertion-term))
@@ -941,14 +1005,6 @@ or :ARG3 init-keywords is also provided."
   ()
   (:documentation
    "Terms that describe the definition of new things."))
-
-(defclass primitive-action-definition-term (definition-term)
-  ()
-  (:documentation
-   "Term describing the definition of a primitive action"))
-
-(defmethod operator ((term primitive-action-definition-term))
-  'define-primitive-action)
 
 (defclass procedure-definition-term (definition-term)
   ()
@@ -967,17 +1023,7 @@ or :ARG3 init-keywords is also provided."
   'define-domain)
 
 (defglobal *definition-operators*
-  '(define-primitive-action     primitive-action-definition-term
-    defaction                   primitive-action-definition-term
-    defprimitive                primitive-action-definition-term
-    primitive-action            primitive-action-definition-term
-    primact                     primitive-action-definition-term
-    define-procedure            procedure-definition-term
-    defprocedure                procedure-definition-term
-    defproc                     procedure-definition-term
-    procedure                   procedure-definition-term
-    proc                        procedure-definition-term
-    define-domain               domain-definition-term
+  '(define-domain               domain-definition-term
     defdomain                   domain-definition-term))
 
 

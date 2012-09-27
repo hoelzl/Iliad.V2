@@ -7,6 +7,29 @@
 
 (in-package #:odysseus-utilities)
 
+;;; Errors
+;;; ======
+
+;;; Define the RUNTIME-ERROR class here so that all other packages can
+;;; derive from it.
+
+(define-condition runtime-error (simple-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "A runtime error occurred."))))
+
+(define-condition invalid-class (runtime-error)
+  ((expected-class :accessor expected-class :initarg :expected-class
+                   :initform (required-argument :expected-class))
+   (current-class :accessor current-class :initarg :current-class
+                  :initform (required-argument :current-class)))
+  (:report (lambda (condition stream)
+             (format stream "~A is not an instance of ~A"
+                     (class-name (current-class condition))
+                     (class-name (expected-class condition))))))
+
+
 ;;; General utilities
 ;;; =================
 
@@ -24,6 +47,36 @@
 	     (setf (gethash ,key ,hash-table) default)
 	     (values default nil))
 	   (values value t)))))
+
+(defun unquote (thing)
+  (if (and (consp thing) (eql (first thing) 'quote))
+      (second thing)
+      thing))
+
+(defun wrap-in-quote (thing)
+  (if (or (null thing) (numberp thing) (keywordp thing) (stringp thing))
+      thing
+      (list 'quote thing)))
+
+;;; Helper Methods for the MOP
+;;; ==========================
+
+(defun define-method (generic-function-name
+                      &key (qualifiers '()) specializers lambda-list body)
+  (let* ((gf (ensure-generic-function generic-function-name))
+         (method-class (c2mop:generic-function-method-class gf)))
+    (multiple-value-bind (fun initargs)
+        (c2mop:make-method-lambda gf
+                                  (c2mop:class-prototype method-class)
+                                  body
+                                  nil)
+      (add-method gf
+                  (apply #'make-instance method-class
+                         :qualifiers qualifiers
+                         :specializers specializers
+                         :lambda-list lambda-list
+                         :function (compile nil fun)
+                         initargs)))))
 
 ;;; Three-Valued Logic
 ;;; ==================

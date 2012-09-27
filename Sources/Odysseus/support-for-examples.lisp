@@ -24,6 +24,8 @@
 	 :initform (required-argument :name))
    (term :accessor term :initarg :term
 	 :initform (required-argument :term))
+   (set-up-function :accessor set-up-function :initarg :set-up-function
+                    :initform (required-argument :set-up-function))
    (keys :accessor keys :initarg :keys
 	 :initform '())
    (hidden? :accessor hidden? :initarg :hidden?
@@ -31,6 +33,14 @@
 
 (defmethod initialize-instance :after ((self odysseus-example) &key name)
   (add-example name self))
+
+(defgeneric full-source-code (example)
+  (:method ((example symbol))
+    (when example
+      (full-source-code (find-example example))))
+  (:method ((example odysseus-example))
+    (append (funcall (set-up-function example))
+            (list (term example)))))
 
 (defgeneric run-example (example &optional execution-mode)
   (:documentation
@@ -42,12 +52,13 @@
 
   (:method ((example odysseus-example) &optional (execution-mode :online))
     (let ((interpreter (default-interpreter)))
-      (reset-interpreter interpreter)
+      (reset-interpreter interpreter t)
       (setf (onlinep interpreter) (eql execution-mode :online))
       (format t "~&Running example ~A in mode ~A.~%"
 	      (name example) execution-mode)
       (format t "~&Source code: ~25T~:W~%" (term example))
-      (let ((result (apply 'interpret (term example)
+      (let ((result (apply 'interpret
+                           (full-source-code example)
 			   :interpreter interpreter
 			   (keys example))))
 	(format t "~&Result: ~:W~2&" result)))))

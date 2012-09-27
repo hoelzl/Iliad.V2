@@ -9,7 +9,13 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *odysseus-utilities-exports*
-    '(;; General utilities
+    '(;; Errors
+      #:runtime-error
+      #:invalid-class
+      ;; MOP
+      #:define-method
+      ;; General utilities
+      #:unquote #:wrap-in-quote
       #:defglobal
       #:gethash*
       ;; Three-valued logic
@@ -55,7 +61,10 @@
       #:context-mixin #:context
       #:unique-terms-mixin
       #:compilation-unit
-      #:local-context #:outer-context #:local-variables))
+      #:local-context #:outer-context #:local-variables
+      
+      #:set-up-snark
+      #:process-declaration-for-snark))
   
   (defvar *odysseus-term-exports*
     '(#:term #:source
@@ -105,14 +114,19 @@
       #:prioritized-concurrent-term
       #:spawn-term
 
+      #:arity
       #:declaration-term
       #:keywords-mixin #:keywords
+      #:declared-sort #:successor-state
       #:named-declaration-term
       #:sort-declaration-term
       #:subsort-declaration-term #:supersort
-      #:declared-sort
       #:sorts-incompatible-declaration-term #:sorts
-      #:arity
+      #:signature-declaration-term #:signature
+      #:primitive-action-declaration-term
+      #:precondition
+      #:functional-fluent-declaration-term
+      #:relational-fluent-declaration-term
       #:constant-declaration-term
       #:arity-declaration-term
       #:function-declaration-term
@@ -126,7 +140,7 @@
       #:rewrite-assertion-term
       
       #:definition-term
-      #:primitive-action-definition-term
+      #:primitive-action-declaration-term
       #:procedure-definition-term
       #:domain-definition-term
       
@@ -179,7 +193,7 @@
   
   (defvar *odysseus-parser-exports*
     '(#:starts-with-question-mark-p
-      #:unquote
+      #:process-declaration-for-parsing
       #:parse-arguments-for-term
       #:parse-binding
       #:parse-into-term-representation))
@@ -191,8 +205,7 @@
       #:prove-using-snark))
   
   (defvar *odysseus-interpreter-exports*
-    '(#:runtime-error
-      #:no-state-for-situation-error
+    '(#:no-state-for-situation-error
       #:no-next-choice-point-error
       #:online-mode-error
       #:no-backtracking-in-online-mode-error

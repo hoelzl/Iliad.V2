@@ -39,13 +39,44 @@
   (:method ((term empty-program-term))
     'null)
 
+  (:method ((term named-declaration-term))
+    (list* (operator term)
+           (wrap-in-quote (name term))
+           (mapcar #'wrap-in-quote (keywords term))))
+
+  (:method ((term subsort-declaration-term))
+    (list* (operator term)
+           (wrap-in-quote (name term))
+           (wrap-in-quote (supersort term))
+           (mapcar #'wrap-in-quote (keywords term))))
+
+  (:method ((term sorts-incompatible-declaration-term))
+    (list* (operator term)
+           (mapcar #'wrap-in-quote (sorts term))))
+
+  (:method ((term arity-declaration-term))
+    (list* (operator term)
+           (wrap-in-quote (name term))
+           (wrap-in-quote (arity term))
+           (mapcar #'wrap-in-quote (keywords term))))
+
+  (:method ((term ordering-declaration-term))
+    (list* (operator term)
+           (mapcar #'wrap-in-quote (ordered-symbols term))))
+
+  (:method ((term logical-sentence-declaration-term))
+    (list* (operator term)
+           (wrap-in-quote (sentence term))
+           (mapcar #'wrap-in-quote (keywords term))))
+
   (:method ((situation initial-situation))
     (declare (ignore situation))
     'S0)
 
   (:method ((situation successor-situation))
     `(do ,(to-sexpr (action situation))
-	 ,(to-sexpr (previous-situation situation)))))
+         ,(to-sexpr (previous-situation situation)))))
+
 
 (defmethod print-object ((term variable-term) stream)
   (print-unreadable-object (term stream :type t :identity t)
@@ -165,3 +196,40 @@
                    (substitute-term (first new-terms) (first old-terms)
                                     term-or-situation)))
              (substitute-terms (rest new-terms) (rest old-terms) new-term))))))
+
+(defmacro apply* (&rest args)
+  `(progn
+     (format t "~&Applying Snark function.~%")
+     (format t "~&~W~%" (list ,@args))
+     (apply ,@args)))
+
+(defmethod process-declaration-for-snark ((declaration sort-declaration-term))
+  (apply* #'snark:declare-sort (declared-sort declaration) (keywords declaration)))
+
+(defmethod process-declaration-for-snark ((declaration subsort-declaration-term))
+  (apply* #'snark:declare-subsort
+         (declared-sort declaration) (supersort declaration) (keywords declaration)))
+
+(defmethod process-declaration-for-snark ((declaration sorts-incompatible-declaration-term))
+  (apply* #'snark:declare-sorts-incompatible (sorts declaration)))
+
+(defmethod process-declaration-for-snark ((declaration constant-declaration-term))
+  (apply* #'snark:declare-constant (name declaration) (keywords declaration)))
+
+(defmethod process-declaration-for-snark ((declaration function-declaration-term))
+  (apply* #'snark:declare-function (name declaration) (arity declaration) (keywords declaration)))
+
+(defmethod process-declaration-for-snark ((declaration relation-declaration-term))
+  (apply* #'snark:declare-relation (name declaration) (arity declaration) (keywords declaration)))
+
+(defmethod process-declaration-for-snark ((declaration ordering-declaration-term))
+  (apply* #'snark:declare-ordering-greaterp (ordered-symbols declaration)))
+
+(defmethod process-declaration-for-snark ((declaration logical-assertion-term))
+  (apply* #'snark::assert (sentence declaration) (keywords declaration)))
+
+(defmethod process-declaration-for-snark ((declaration logical-assumption-term))
+  (apply* #'snark:assume (sentence declaration) (keywords declaration)))
+
+(defmethod process-declaration-for-snark ((declaration rewrite-assertion-term))
+  (apply* #'snark:assert-rewrite (sentence declaration) (keywords declaration)))

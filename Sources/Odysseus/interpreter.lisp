@@ -10,12 +10,6 @@
 ;;; Runtime Errors
 ;;; ==============
 
-(define-condition runtime-error (simple-error)
-  ()
-  (:report (lambda (condition stream)
-             (declare (ignore condition))
-             (format stream "A runtime error occurred."))))
-
 (define-condition no-state-for-situation-error (runtime-error)
   ((situation :reader situation :initarg :situation))
   (:report (lambda (condition stream)
@@ -291,8 +285,7 @@ raises an error otherwise.")
           (multiple-value-bind (result reason answer)
               (prove-using-snark proof-term
                                  :answer `(answer ,@free-variable-sexprs)
-                                 ;; FIXME: need to provide a correct theory
-                                 :set-up-theory 'set-up-theory)
+                                 :context (context interpreter))
             (when *trace-odysseus*
               (when  (and (eql reason :refutation-found) *print-snark-refutations*)
                 (format t "~&Refutation found for~25T~:W." proof-term))
@@ -354,6 +347,7 @@ raises an error otherwise.")
                  situation interpreter)
          (setf (gethash situation (state-map interpreter))
                new-state))))
+
 
 
 ;;; Single-Step Interpretation
@@ -488,6 +482,11 @@ returned as first argument."))
               (append choice-points (choice-points interpreter)))
         (backtrack interpreter))))
 
+(defmethod interpret-1
+    ((interpreter basic-interpreter) (term declaration-term) situation)
+  (values (the-no-operation-term interpreter)
+          (the-empty-program-term interpreter)
+          situation))
 
 ;;; Interpretation
 ;;; ==============

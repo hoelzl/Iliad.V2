@@ -32,38 +32,37 @@
   (use-conditional-answer-creation t)
   ;; (use-subsumption-by-false nil)
   (use-constructive-answer-restriction nil)
-  (allow-skolem-symbols-in-answers nil)
-  )
+  (allow-skolem-symbols-in-answers nil))
 
 
 (defun prove-or-refute (term &rest args
-			&key (set-up-theory 'set-up-theory)
+			&key context
 			&allow-other-keys)
+  (assert context (context)
+          "Cannot prove or refute without a context.")
   (initialize-snark)
-  (funcall set-up-theory)
-  (let* ((new-args (print (alexandria:remove-from-plist args :set-up-theory)))
+  (set-up-snark context)
+  (let* ((new-args (alexandria:remove-from-plist args :set-up-theory :context))
 	 (result (apply 'prove term new-args)))
     (ecase result
       (:proof-found result)
       ((:run-time-limit :agenda-empty)
        (initialize-snark)
-       (funcall set-up-theory)
+       (set-up-snark context)
        (let ((result (apply 'prove `(snark::not ,term) new-args)))
 	 (ecase result
 	   (:proof-found :refutation-found)
 	   (:agenda-empty :agenda-empty)
 	   (:run-time-limit result)))))))
 
-(defun ida-prove-or-refute (term &rest args
-			    &key (set-up-theory 'set-up-theory)
-			    &allow-other-keys)
+(defun ida-prove-or-refute (term &rest args &key context &allow-other-keys)
   (let* ((initial-run-time-limit 0.1)
 	 (run-time-limit initial-run-time-limit)
 	 (iterations 20))
     (dotimes (i iterations)
       (initialize-snark)
       (run-time-limit run-time-limit)
-      (funcall set-up-theory)
+      (set-up-snark context)
       (let ((result (apply 'prove-or-refute term args)))
 	(if (eql result :run-time-limit)
 	    (setf run-time-limit (* 2 run-time-limit))
@@ -73,8 +72,8 @@
 
 (defvar *print-snark-output* nil)
 
-(defun prove-using-snark (term &rest args &key set-up-theory answer)
-  (declare (ignore set-up-theory))
+(defun prove-using-snark (term &rest args &key context answer)
+  (declare (ignore context))
   (unless answer
     (alexandria:remove-from-plistf args :answer))
   (flet ((do-prove ()
