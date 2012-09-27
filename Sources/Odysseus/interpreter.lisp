@@ -470,6 +470,8 @@ returned as first argument."))
               rest-term
               new-situation))))
 
+(defvar *permute-offline-choice* t)
+
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term action-choice-term) situation)
   (if (onlinep interpreter)
@@ -477,7 +479,9 @@ returned as first argument."))
       (let ((choice-points
               (mapcar (lambda (choice)
                         (make-choice-point interpreter choice situation))
-                      (reverse (body term)))))
+                      (if *permute-offline-choice*
+                          (shuffle (body term))
+                          (reverse (body term))))))
         (setf (choice-points interpreter)
               (append choice-points (choice-points interpreter)))
         (backtrack interpreter))))

@@ -222,6 +222,9 @@
       #:execute-stored-actions #:execute-primitive-action
       #:state-map #:can-set-state-p #:state
 
+      ;; TODO: should belong to the configuration framework.
+      #:*permute-offline-choice*
+
       #:primitive-action-definition
       ;; These are originally exported from the context exports.  Not sure if
       ;; we should have them here as well. --tc
