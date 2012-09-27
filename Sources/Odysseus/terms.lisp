@@ -54,6 +54,10 @@
     (cerror "Create the instance without interning it."
 	    "Trying to intern term ~A." term)))
 
+(defgeneric declared-sort (term)
+  (:documentation
+   "Returns the sort of TERM, or NIL if no sort for TERM is known."))
+
 (defgeneric source (term)
   (:documentation
     "The source form from which the term was derived, or NIL if no source is
@@ -86,29 +90,44 @@
   ((unique-name
     :initform nil
     :documentation "A unique name for code generation.")
+   (declared-sort
+    :accessor declared-sort :initarg :sort :initform t
+    :documentation
+    "The declared sort of the variable or T if no sort was declared.")
    (is-bound-p 
     :accessor is-bound-p :initarg :is-bound-p :initform nil
     :documentation "True if the variable is bound."))
   (:documentation
    "Representation of variables."))
 
+(defvar *unique-variable-counter* -1)
+
 (defgeneric unique-name (term)
   (:documentation 
    "Return a unique name for TERM or raise an error if it has no unique name.")
+
   (:method (term)
     (error "Term ~A has no unique name." term))
+
   (:method ((term variable-term))
     (or (slot-value term 'unique-name)
         (setf (slot-value term 'unique-name)
-              (gensym (if (name term) (format nil "~A" (name term)) "VAR"))))))
+              (make-symbol (format nil "?~:[VAR~;~:*~A~]~A.~A"
+                                   (name term)
+                                   (incf *unique-variable-counter*)
+                                   (declared-sort term)))))))
 
-(define-interning-make-instance variable name)
+(define-interning-make-instance variable name sort)
 
-(defun make-variable-term (name context &key (intern t) (is-bound-p nil))
+(defun make-variable-term (name sort context &key (intern t) (is-bound-p nil))
+  (when (stringp name)
+    (setf name (intern name)))
+  (when (stringp sort)
+    (setf sort (intern sort)))
   (assert (typep name 'symbol) (name)
           "~A cannot denote a variable (it is not a symbol)." name)
   (make-instance 'variable-term
-                 :name name :context context :source name
+                 :name name :sort sort :context context :source name
                  :intern intern :is-bound-p is-bound-p))
 
 (defclass atomic-term (term)
@@ -343,40 +362,17 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "Representation of terms that have a body."))
 
-(defclass binding ()
-  ((binding-variable 
-    :accessor binding-variable :initarg :variable
-    :initform (required-argument :variable))
-   (binding-keywords
-    :accessor binding-keywords :initarg :keywords :initform '()
-    :documentation
-    "A plist consisting of the keyword-value pairs provided by the binding
-    declaration.  The values are in unparsed form.")
-   (binding-context
-    :accessor binding-context :initarg :context
-    :initform (required-argument :context)
-    :documentation "The context in which this binding was made.")))
-
 (defgeneric bound-variables (binding-term)
   (:documentation
-   "The variables bound by BINDING-TERM.  The value should always be equal
-    to (mapcar 'binding-variable (bindings binding-term))."))
+   "The variables bound by BINDING-TERM."))
 
 (defclass binding-term (known-compound-term)
-  ((bound-variables :initform '()
-    :documentation "Cache for the variables bound by that term.")
-   (bindings
-    :accessor bindings :initarg :bindings :initform '()
-    :documentation "The binding for the term."))
+  ((bound-variables
+    :accessor bound-variables :initarg :bound-variables :initform '()
+    :documentation "The bound variables for the term."))
   (:documentation
    "A term that binds variables.  Each subclass has to specify the scope in
    which the variables are bound."))
-
-(defmethod bound-variables ((term binding-term))
-  (or (slot-value term 'bound-variables)
-      (setf (slot-value term 'bound-variables)
-            (mapcar 'binding-variable (bindings term)))))
-
 
 ;;; Logical Compounds
 ;;; =================
@@ -678,11 +674,8 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "Mixin that provides a KEYWORDS slot."))
 
-(defgeneric declared-sort (term)
-  (:documentation
-   "Returns the sort of TERM, or NIL if no sort for TERM is known.")
-  (:method ((term keywords-mixin))
-    (getf (keywords term) :sort)))
+(defmethod declared-sort ((term keywords-mixin))
+  (getf (keywords term) :sort))
 
 (defgeneric successor-state (term)
   (:documentation

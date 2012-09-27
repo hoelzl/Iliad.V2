@@ -112,17 +112,17 @@
   (dolist (action (default-primitive-action-names))
     (declare-primitive-action action self)))
 
-(defmethod lookup-variable (name (context compilation-unit) &optional (create? t))
+(defmethod lookup-variable (name sort (context compilation-unit) &optional (create? t))
   (let ((hash-table (slot-value context 'variable-hash-table)))
     (multiple-value-bind (variable exists?)
 	(gethash name hash-table nil)
       (cond (exists? variable)
 	    (create?
-	     (setf (lookup-variable name context)
-		   (make-variable-term name context :intern nil)))
+	     (setf (lookup-variable name sort context)
+		   (make-variable-term name sort context :intern nil)))
 	    (t nil)))))
 
-(defmethod (setf lookup-variable) (new-value name (context compilation-unit))
+(defmethod (setf lookup-variable) (new-value name sort (context compilation-unit))
   (check-type new-value variable-term)
   (let ((hash-table (slot-value context 'variable-hash-table)))
     (setf (gethash name hash-table) new-value)))
@@ -177,20 +177,20 @@
   (:documentation
    "A temporary context for forms that bind variables."))
 
-(defmethod lookup-variable (name (context local-context) &optional (create? t))
+(defmethod lookup-variable (name sort (context local-context) &optional (create? t))
   (let ((local-binding (assoc name (local-variables context))))
     (if local-binding
         (cdr local-binding)
         (let* ((enclosing-context (enclosing-context context))
-               (outer-var (lookup-variable name enclosing-context nil)))
+               (outer-var (lookup-variable name sort enclosing-context nil)))
           (or outer-var
               (if create?
-                  (let ((var (make-variable-term name context :intern nil)))
+                  (let ((var (make-variable-term name sort context :intern nil)))
                     (push (cons name var) (local-variables context))
                     var)
                   nil))))))
 
-(defmethod (setf lookup-variable) (new-value name (context local-context))
+(defmethod (setf lookup-variable) (new-value name sort (context local-context))
   (let ((binding (assoc name (local-variables context))))
     (cond (binding
            (setf (cdr binding) new-value))

@@ -12,7 +12,7 @@
    "Convert TERM into an S-expression.")
 
   (:method ((term variable-term))
-    (name term))
+    (unique-name term))
 
   (:method ((term number-term))
     (value term))

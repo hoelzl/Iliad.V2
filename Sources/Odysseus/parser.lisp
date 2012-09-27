@@ -97,27 +97,23 @@ followed by a property list of keyword-value pairs."))
 (defmethod parse-binding (binding (term binding-term) context)
   "Default implementation for PARSE-BINDING, parsing the variable and
 accepting all keyword arguments without parsing any of them."
-  (let* ((binding (ensure-list binding))
-         (binding-variable
-           (parse-into-term-representation (first binding) context))
-         (keywords (rest binding)))
+  (let ((binding-variable (parse-variable-term binding context))
+        ;; Maybe mix keywords-mixin into variable and save the keywords?
+        #+(or)
+        (keywords (if (consp binding) (rest binding) '())))
     (check-type binding-variable variable-term)
     (setf (is-bound-p binding-variable) t)
-    ;; TODO: maybe check that keywords is a plist in the proper form?
-    (make-instance 'binding
-                   :variable binding-variable
-                   :keywords keywords
-                   :context context)))
+    binding-variable))
 
 (defmethod parse-arguments-for-term :around ((term binding-term) arguments context)
   "Parse the binding list and then call the next method on the rest of the
 argument list."
   (let* ((binding-list (ensure-list (first arguments)))
          (new-context (make-instance 'local-context :enclosing-context context))
-         (bindings (mapcar (lambda (binding)
-                             (parse-binding binding term new-context))
-                           binding-list)))
-    (setf (bindings term) bindings)
+         (bound-variables (mapcar (lambda (binding)
+                                    (parse-binding binding term new-context))
+                                  binding-list)))
+    (setf (bound-variables term) bound-variables)
     (call-next-method term (rest arguments) new-context)))
 
 (defmethod parse-arguments-for-term :after ((term declaration-term) arguments context)
@@ -172,6 +168,33 @@ the new context equals the one in which it was originally parsed."
           term context)
   term)
 
+(defgeneric parse-variable-term (exp compilation-context)
+  (:documentation
+   "Parse EXP as a VARIABLE-TERM.")
+
+  (:method ((exp symbol) (context compilation-context))
+    (let* ((name (symbol-name exp))
+           (start-index (if (eql (aref name 0) #\?) 1 0))
+           (dot-index (position #\. name))
+           (real-name (subseq name start-index dot-index))
+           (sort-name (if (and dot-index (< dot-index (1- (length name))))
+                          (subseq name (1+ dot-index))
+                          "T")))
+      (make-variable-term real-name sort-name context)))
+
+  (:method ((exp cons) (context compilation-context))
+    (destructuring-bind (name &key sort &allow-other-keys) exp
+      (let ((var (parse-variable-term name context)))
+        (when sort
+          (if (and (declared-sort var)
+                   (not (eql (declared-sort var) t))
+                   (not (eql (declared-sort var) sort)))
+              (cerror "Ignore the explicit sort declaration."
+                      'incompatible-sort-declarations
+                      :thing exp (declared-sort var) sort)
+              (setf (declared-sort var) sort)))
+        var))))
+
 (defmethod parse-into-term-representation ((exp symbol) (context compilation-context))
   "Parse a single symbol.
 If it is NIL or NULL return an empty program term.
@@ -180,7 +203,7 @@ If neither of these cases apply, return a primitive term."
   (cond ((or (eql exp 'nil) (eql exp 'null))
 	 (make-instance 'empty-program-term :context context :source exp))
 	((starts-with-question-mark-p exp)
-	 (make-variable-term exp context))
+	 (parse-variable-term exp context))
 	(t
 	 (make-instance 'primitive-term
                         :value exp :context context :source exp))))

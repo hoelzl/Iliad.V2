@@ -29,6 +29,14 @@
                      (class-name (current-class condition))
                      (class-name (expected-class condition))))))
 
+(define-condition incompatible-sort-declarations (runtime-error)
+  ((thing :initarg :thing)
+   (sort-1 :initarg :sort-1)
+   (sort-2 :initarg :sort-2))
+  (:report (lambda (condition stream)
+             (with-slots (thing sort-1 sort-2) condition
+               (format stream "Incompatible sort declarations for ~W: ~W, ~W."
+                       thing sort-1 sort-2)))))
 
 ;;; General utilities
 ;;; =================

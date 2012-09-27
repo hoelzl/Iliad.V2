@@ -21,13 +21,14 @@
 
 #+5am
 (5am:test (test-make-variable :compile-at :definition-time)
-  (let ((var (make-variable-term 'foo nil :intern nil)))
+  (let ((var (make-variable-term 'foo 'bar nil :intern nil)))
     (5am:is (eql 'foo (name var)))
+    (5am:is (eql 'bar (declared-sort var)))
     (5am:is (symbolp (unique-name var)))
     ;; Check that the unique name is in fact interned.
     (5am:is (eql (unique-name var) (unique-name var)))
     (5am:is (eql nil (symbol-package (unique-name var))))
-    (let ((var2 (make-variable-term 'foo nil :intern nil)))
+    (let ((var2 (make-variable-term 'foo 'bar nil :intern nil)))
       (5am:is (not (eql (unique-name var) (unique-name var2)))))))
 
 #+5am
@@ -36,21 +37,21 @@
   (let* ((cu (make-instance 'compilation-unit))
          (vars (syntax::variable-hash-table cu)))
     (5am:is (= (hash-table-count vars) 0))
-    (5am:is (eql (lookup-variable 'foo cu nil) nil))
+    (5am:is (eql (lookup-variable 'foo 'foo-sort cu nil) nil))
     (5am:is (= (hash-table-count vars) 0))
-    (let ((foo (lookup-variable 'foo cu t))
+    (let ((foo (lookup-variable 'foo 'foo-sort cu t))
           (bar (make-instance 'variable-term
-                              :name 'bar :intern nil
+                              :name 'bar :sort 'bar-sort :intern nil
                               :context cu)))
       (5am:is (= (hash-table-count vars) 1))
       (5am:is (eql (gethash 'foo vars) foo))
-      (5am:is (eql (lookup-variable 'foo cu) foo))
-      (setf (lookup-variable 'bar cu) bar)
+      (5am:is (eql (lookup-variable 'foo 'foo-sort cu) foo))
+      (setf (lookup-variable 'bar 'bar-sort cu) bar)
       (5am:is (= (hash-table-count vars) 2))
       (5am:is (eql (gethash 'bar vars) bar))
-      (5am:is (eql (lookup-variable 'bar cu) bar))
+      (5am:is (eql (lookup-variable 'bar 'bar-sort cu) bar))
       (5am:is (eql (gethash 'foo vars) foo))
-      (5am:is (eql (lookup-variable 'foo cu) foo)))))
+      (5am:is (eql (lookup-variable 'foo 'foo-sort cu) foo)))))
 
 #+5am
 (5am:test (test-local-lookup-for-variable
@@ -59,9 +60,9 @@
          (vars (syntax::variable-hash-table cu))
          (lc (make-instance 'local-context :enclosing-context cu)))
     (5am:is (eql (local-variables lc) '()))
-    (5am:is (eql (lookup-variable 'foo lc nil) nil))
+    (5am:is (eql (lookup-variable 'foo 'foo-sort lc nil) nil))
     (5am:is (eql (local-variables lc) '()))
-    (let ((foo (lookup-variable 'foo lc t))
+    (let ((foo (lookup-variable 'foo 'foo-sort lc t))
           (bar (make-instance 'variable-term
                               :name 'bar :intern nil
                               :context lc))
@@ -70,25 +71,25 @@
                               :context lc)))
       (5am:is (equalp (local-variables lc) (list (cons 'foo foo))))
       (5am:is (= (hash-table-count vars) 0))
-      (5am:is (eql foo (lookup-variable 'foo lc nil)))
-      (5am:is (eql nil (lookup-variable 'bar lc nil)))
-      (5am:is (eql nil (lookup-variable 'baz lc nil)))
+      (5am:is (eql foo (lookup-variable 'foo 'foo-sort lc nil)))
+      (5am:is (eql nil (lookup-variable 'bar 'bar-sort lc nil)))
+      (5am:is (eql nil (lookup-variable 'baz 'baz-sort lc nil)))
 
-      (setf (lookup-variable 'bar lc) bar)
+      (setf (lookup-variable 'bar 'bar-sort lc) bar)
       (5am:is (= (hash-table-count vars) 0))
       (5am:is (equalp (assoc 'bar (local-variables lc)) (cons 'bar bar)))
-      (5am:is (eql foo (lookup-variable 'foo lc nil)))
-      (5am:is (eql bar (lookup-variable 'bar lc nil)))
-      (5am:is (eql nil (lookup-variable 'baz lc nil)))
+      (5am:is (eql foo (lookup-variable 'foo 'foo-sort lc nil)))
+      (5am:is (eql bar (lookup-variable 'bar 'bar-sort lc nil)))
+      (5am:is (eql nil (lookup-variable 'baz 'baz-sort lc nil)))
 
-      (setf (lookup-variable 'baz cu) baz)
+      (setf (lookup-variable 'baz 'baz-sort cu) baz)
       (5am:is (= (hash-table-count vars) 1))
-      (5am:is (eql foo (lookup-variable 'foo lc nil)))
-      (5am:is (eql bar (lookup-variable 'bar lc nil)))
-      (5am:is (eql baz (lookup-variable 'baz lc nil)))
-      (5am:is (eql nil (lookup-variable 'foo cu nil)))
-      (5am:is (eql nil (lookup-variable 'bar cu nil)))
-      (5am:is (eql baz (lookup-variable 'baz cu nil))))))
+      (5am:is (eql foo (lookup-variable 'foo 'foo-sort lc nil)))
+      (5am:is (eql bar (lookup-variable 'bar 'bar-sort lc nil)))
+      (5am:is (eql baz (lookup-variable 'baz 'baz-sort lc nil)))
+      (5am:is (eql nil (lookup-variable 'foo 'foo-sort cu nil)))
+      (5am:is (eql nil (lookup-variable 'bar 'bar-sort cu nil)))
+      (5am:is (eql baz (lookup-variable 'baz 'baz-sort cu nil))))))
 
 
 

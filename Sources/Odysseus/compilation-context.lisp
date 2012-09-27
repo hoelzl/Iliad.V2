@@ -69,13 +69,13 @@ etc. for this context."))
   (:documentation
    "Assign NEW-VALUE as the new value of LOOKUP-FUNCTOR for NAME and ARITY."))
 
-(defgeneric lookup-variable (name context &optional create?)
+(defgeneric lookup-variable (name sort context &optional create?)
   (:documentation
-   "Return the variable NAME for the given CONTEXT if it
+   "Return the variable NAME with sort SORT for the given CONTEXT if it
    exists. Otherwise, if CREATE? is true, create and return a fresh
    variable, if CREATE? is false return NIL."))
 
-(defgeneric (setf lookup-variable) (new-value name context)
+(defgeneric (setf lookup-variable) (new-value name sort context)
   (:documentation
    "Assign NEW-VALUE as the new value of LOOKUP-VARIABLE for NAME."))
 

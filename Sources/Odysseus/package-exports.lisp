@@ -70,7 +70,7 @@
   
   (defvar *odysseus-term-exports*
     '(#:term #:source
-      #:variable-term #:unique-name #:is-bound-p
+      #:variable-term #:unique-name #:variable-sort #:is-bound-p
       #:make-variable-term 
       #:atomic-term
       #:primitive-term #:value
@@ -87,8 +87,7 @@
       #:ternary-term #:arg1 #:arg2 #:arg3
       #:known-general-application-term
       #:body-term #:body
-      #:binding #:binding-variable #:binding-keywords #:binding-context
-      #:binding-term #:bound-variables #:bindings
+      #:binding-term #:bound-variables
       
       #:conjunction-term
       #:disjunction-term
