@@ -197,6 +197,7 @@
                                     term-or-situation)))
              (substitute-terms (rest new-terms) (rest old-terms) new-term))))))
 
+#+(or)
 (defmacro apply* (&rest args)
   `(progn
      (format t "~&Applying Snark function.~%")
@@ -204,32 +205,32 @@
      (apply ,@args)))
 
 (defmethod process-declaration-for-snark ((declaration sort-declaration-term))
-  (apply* #'snark:declare-sort (declared-sort declaration) (keywords declaration)))
+  (apply #'snark:declare-sort (declared-sort declaration) (keywords declaration)))
 
 (defmethod process-declaration-for-snark ((declaration subsort-declaration-term))
-  (apply* #'snark:declare-subsort
+  (apply #'snark:declare-subsort
          (declared-sort declaration) (supersort declaration) (keywords declaration)))
 
 (defmethod process-declaration-for-snark ((declaration sorts-incompatible-declaration-term))
-  (apply* #'snark:declare-sorts-incompatible (sorts declaration)))
+  (apply #'snark:declare-sorts-incompatible (sorts declaration)))
 
 (defmethod process-declaration-for-snark ((declaration constant-declaration-term))
-  (apply* #'snark:declare-constant (name declaration) (keywords declaration)))
+  (apply #'snark:declare-constant (name declaration) (keywords declaration)))
 
 (defmethod process-declaration-for-snark ((declaration function-declaration-term))
-  (apply* #'snark:declare-function (name declaration) (arity declaration) (keywords declaration)))
+  (apply #'snark:declare-function (name declaration) (arity declaration) (keywords declaration)))
 
 (defmethod process-declaration-for-snark ((declaration relation-declaration-term))
-  (apply* #'snark:declare-relation (name declaration) (arity declaration) (keywords declaration)))
+  (apply #'snark:declare-relation (name declaration) (arity declaration) (keywords declaration)))
 
 (defmethod process-declaration-for-snark ((declaration ordering-declaration-term))
-  (apply* #'snark:declare-ordering-greaterp (ordered-symbols declaration)))
+  (apply #'snark:declare-ordering-greaterp (ordered-symbols declaration)))
 
 (defmethod process-declaration-for-snark ((declaration logical-assertion-term))
-  (apply* #'snark::assert (sentence declaration) (keywords declaration)))
+  (apply #'snark::assert (sentence declaration) (keywords declaration)))
 
 (defmethod process-declaration-for-snark ((declaration logical-assumption-term))
-  (apply* #'snark:assume (sentence declaration) (keywords declaration)))
+  (apply #'snark:assume (sentence declaration) (keywords declaration)))
 
 (defmethod process-declaration-for-snark ((declaration rewrite-assertion-term))
-  (apply* #'snark:assert-rewrite (sentence declaration) (keywords declaration)))
+  (apply #'snark:assert-rewrite (sentence declaration) (keywords declaration)))

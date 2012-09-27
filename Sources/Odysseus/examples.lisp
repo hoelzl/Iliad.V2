@@ -7,23 +7,9 @@
 
 (in-package #:odysseus-user)
 
-;; TODO: Generate DECLARE-PRIMITIVE-ACTION calls
-;;       Generate DECLARE-FUNCTION
+;; TODO: Generate DECLARE-FUNCTION calls from DECLARE-FUNCTIONAL-FLUENT
+;;       Generate DECLARE-RELATION calls from DELCARE-RELATIONAL-FLUENT
 ;;       Generate unique names axioms
-#||
-(define-relational-fluent 'is-rested-p)
-(define-primitive-action 'eat '(action person))
-(define-primitive-action 'work '(action person duration))
-(define-primitive-action 'sleep '(action person duration))
-(define-primitive-action 'celebrate '(person)
-  :precondition '(iff (poss (celebrate ?p.person) ?s.situation)
-                  (is-rested-p ?p.person ?s.situation)))
-
-(declare-primitive-action 'eat (default-interpreter))
-(declare-primitive-action 'work (default-interpreter))
-(declare-primitive-action 'sleep (default-interpreter))
-(declare-primitive-action 'celebrate (default-interpreter))
-||#
 
 (defvar *is-rested-p-axiom*
   '(forall ((p :sort person)

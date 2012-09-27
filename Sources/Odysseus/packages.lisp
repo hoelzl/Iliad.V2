@@ -10,11 +10,7 @@
 (defpackage #:odysseus-utilities
   (:use #:common-lisp #:alexandria #:iterate)
   (:nicknames #:utils)
-  (:export . #.*odysseus-utilities-exports*)
-  ;; HACK: To temporarily fix the package problems for Snark evaluation.
-  (:export #:do #:no-operation
-           #:eat #:sleep #:work #:celebrate #:is-rested-p
-           #:annabelle #:lenz #:matthias))
+  (:export . #.*odysseus-utilities-exports*))
 
 (defpackage #:odysseus-syntax
   ;; The odysseus-syntax package contains the implementation of contexts, and
@@ -99,8 +95,6 @@
 (defpackage #:odysseus-user
   (:use #:common-lisp #:alexandria #:iterate
         #:common-lisp-user
-        ;; To fix problems with symbols when calling Snark.
-        #:odysseus-utilities
         #:odysseus))
 
 (defpackage #:odysseus-tests
