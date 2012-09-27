@@ -184,15 +184,23 @@ primitive-action definition for OPERATOR in CONTEXT.")
 ;;; Interaction with Snark.
 ;;; ======================
 
+(define-condition invalid-declaration-type (runtime-error)
+  ((declaration :initarg :declaration
+                :initform (required-argument :declaration)))
+  (:report (lambda (condition stream)
+             (with-slots (declaration) condition
+               (format stream "~W is not a valid declaration for Snark."
+                       declaration)))))
+                     
+  
+
 (defgeneric process-declaration-for-snark (declaration)
   (:documentation
    "Process DECLARATION so that the declared entity exists in Snark's
    theory.")
   (:method (declaration)
-    ;; TODO: Turn this into an error once we have completed the
-    ;; implementation.
-    (format *error-output* "~&Don't know how to process declaration ~W.~%"
-            declaration)))
+    (cerror "Continue without processing the declaration."
+            'invalid-declaration-type :declaration declaration)))
 
 (defgeneric set-up-snark (compilation-context)
   (:documentation

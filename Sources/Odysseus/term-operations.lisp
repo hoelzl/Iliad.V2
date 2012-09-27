@@ -205,32 +205,71 @@
      (apply ,@args)))
 
 (defmethod process-declaration-for-snark ((declaration sort-declaration-term))
-  (apply #'snark:declare-sort (declared-sort declaration) (keywords declaration)))
+  (apply #'snark:declare-sort (declared-sort declaration) (keywords declaration))
+  :declare-sort)
 
 (defmethod process-declaration-for-snark ((declaration subsort-declaration-term))
   (apply #'snark:declare-subsort
-         (declared-sort declaration) (supersort declaration) (keywords declaration)))
+         (declared-sort declaration) (supersort declaration) (keywords declaration))
+  :declare-subsort)
 
 (defmethod process-declaration-for-snark ((declaration sorts-incompatible-declaration-term))
-  (apply #'snark:declare-sorts-incompatible (sorts declaration)))
+  (apply #'snark:declare-sorts-incompatible (sorts declaration))
+  :declare-sorts-incompatible)
 
 (defmethod process-declaration-for-snark ((declaration constant-declaration-term))
-  (apply #'snark:declare-constant (name declaration) (keywords declaration)))
+  (apply #'snark:declare-constant (name declaration) (keywords declaration))
+  :declare-constant)
 
 (defmethod process-declaration-for-snark ((declaration function-declaration-term))
-  (apply #'snark:declare-function (name declaration) (arity declaration) (keywords declaration)))
+  (apply #'snark:declare-function (name declaration) (arity declaration) (keywords declaration))
+  :declare-function)
 
 (defmethod process-declaration-for-snark ((declaration relation-declaration-term))
-  (apply #'snark:declare-relation (name declaration) (arity declaration) (keywords declaration)))
+  (apply #'snark:declare-relation (name declaration) (arity declaration) (keywords declaration))
+  :declare-relation)
 
 (defmethod process-declaration-for-snark ((declaration ordering-declaration-term))
-  (apply #'snark:declare-ordering-greaterp (ordered-symbols declaration)))
+  (apply #'snark:declare-ordering-greaterp (ordered-symbols declaration))
+  :declare-ordering-greaterp)
 
 (defmethod process-declaration-for-snark ((declaration logical-assertion-term))
-  (apply #'snark::assert (sentence declaration) (keywords declaration)))
+  (apply #'snark::assert (sentence declaration) (keywords declaration))
+  :assert)
 
 (defmethod process-declaration-for-snark ((declaration logical-assumption-term))
-  (apply #'snark:assume (sentence declaration) (keywords declaration)))
+  (apply #'snark:assume (sentence declaration) (keywords declaration))
+  :assume)
 
 (defmethod process-declaration-for-snark ((declaration rewrite-assertion-term))
-  (apply #'snark:assert-rewrite (sentence declaration) (keywords declaration)))
+  (apply #'snark:assert-rewrite (sentence declaration) (keywords declaration))
+  :assert-rewrite)
+
+(defmethod process-declaration-for-snark ((declaration primitive-action-declaration-term))
+  (let ((signature (signature declaration))
+        (keywords (remove-from-plist (keywords declaration) :precondition)))
+    (apply #'snark:declare-function
+           (name declaration)
+           (1- (length signature))
+           :sort signature
+           keywords))
+  :primitive-action/declare-function)
+
+(defmethod process-declaration-for-snark ((declaration relational-fluent-declaration-term))
+  (let ((signature (signature declaration)))
+    (apply #'snark:declare-relation
+           (name declaration)
+           (1- (length signature))
+           :sort signature
+           (keywords declaration)))
+  :fluent/declare-relation)
+
+(defmethod process-declaration-for-snark ((declaration functional-fluent-declaration-term))
+  (let ((signature (signature declaration)))
+    (apply #'snark:declare-function
+           (name declaration)
+           (1- (length signature))
+           :sort signature
+           (keywords declaration)))
+  :fluent/declare-function)
+

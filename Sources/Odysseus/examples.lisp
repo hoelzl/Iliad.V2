@@ -48,29 +48,18 @@
     
     ;; Fluent
     (declare-relational-fluent 'is-rested-p '(person situation))
+    #+(or)
     (declare-relation 'is-rested-p 2
                       :sort '(person situation))
 
     (declare-primitive-action 'eat '(action person))
-    (declare-primitive-action 'work '(action person duration))
-    (declare-primitive-action 'sleep '(action person duration))
+    (declare-primitive-action 'work '(action person))
+    (declare-primitive-action 'sleep '(action person))
     (declare-primitive-action 'celebrate '(action person)
       :precondition '(iff (poss (celebrate ?p.person) ?s.situation)
                           (is-rested-p ?p.person ?s.situation)))
   
     ;; Actions
-    (declare-function 'work 1
-  		    :sort '(action person)
-  		    :injective t)
-    (declare-function 'sleep 1
-  		    :sort '(action person)
-  		    :injective t)
-    (declare-function 'celebrate 1
-                      :sort '(action person)
-                      :injective t)
-    (declare-function 'eat 1
-                      :sort '(action person)
-                      :injective t)
     (declare-function 'no-operation 0
                       :sort '(action)
                       :injective t)
