@@ -398,7 +398,8 @@ returned as first argument."))
   (multiple-value-bind (can-execute-p reason free-variables answer)
       (can-execute-p interpreter term situation)
     (cond (can-execute-p
-           (let* ((context (context interpreter))
+           (let* ((context (make-instance 'local-context
+                             :enclosing-context (context interpreter)))
                   (new-terms
                     (mapcar (lambda (exp)
                               (parse-into-term-representation exp context))
