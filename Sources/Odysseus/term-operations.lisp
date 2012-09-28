@@ -201,13 +201,6 @@
                                     term-or-situation)))
              (substitute-terms (rest new-terms) (rest old-terms) new-term))))))
 
-#+(or)
-(defmacro apply* (&rest args)
-  `(progn
-     (format t "~&Applying Snark function.~%")
-     (format t "~&~W~%" (list ,@args))
-     (apply ,@args)))
-
 (defmethod process-declaration-for-snark ((declaration sort-declaration-term))
   (apply #'snark:declare-sort (declared-sort declaration) (keywords declaration))
   :declare-sort)
@@ -303,16 +296,6 @@
       (values vars
               (cons (name term) vars))))
 
-  (:method ((term relational-fluent-declaration-term) (context compilation-context))
-    ;; The signature of relations contains only the argument types.
-    #+(or)
-    (let* ((signature (signature term))
-           (vars (mapcar (lambda (sort)
-                           (make-anonymous-variable-term sort context))
-                         signature)))
-      (values vars
-              (cons (name term) vars))))
-
   (:method ((term constant-declaration-term) (context compilation-context))
     (values '()
             (name term)))
@@ -324,17 +307,6 @@
                                (make-anonymous-variable-term sort context))
                              (rest signature))
                      '())))
-      (values vars
-              (cons (name term) vars))))
-  
-  (:method ((term relation-declaration-term) (context compilation-context))
-    #+(or)
-    (let* ((signature (declared-sort term))
-           (vars (if (consp signature)
-                     (mapcar (lambda (sort)
-                               (make-anonymous-variable-term sort context))
-                             signature)
-                     (list (make-anonymous-variable-term signature context)))))
       (values vars
               (cons (name term) vars)))))
 

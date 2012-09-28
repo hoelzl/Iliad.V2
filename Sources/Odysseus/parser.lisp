@@ -101,10 +101,7 @@ followed by a property list of keyword-value pairs."))
 (defmethod parse-binding (binding (term binding-term) context)
   "Default implementation for PARSE-BINDING, parsing the variable and
 accepting all keyword arguments without parsing any of them."
-  (let ((binding-variable (parse-variable-term binding context))
-        ;; Maybe mix keywords-mixin into variable and save the keywords?
-        #+(or)
-        (keywords (if (consp binding) (rest binding) '())))
+  (let ((binding-variable (parse-variable-term binding context)))
     (check-type binding-variable variable-term)
     (setf (is-bound-p binding-variable) t)
     binding-variable))
@@ -113,8 +110,6 @@ accepting all keyword arguments without parsing any of them."
   "Parse the binding list and then call the next method on the rest of the
 argument list."
   (let* ((binding-list (ensure-list (first arguments)))
-         #+(or)
-         (new-context (make-instance 'local-context :enclosing-context context))
          (bound-variables (mapcar (lambda (binding)
                                     (parse-binding binding term context))
                                   binding-list)))

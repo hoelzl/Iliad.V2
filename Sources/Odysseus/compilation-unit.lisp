@@ -65,14 +65,6 @@
           *declaration-operators*
           *definition-operators*))
 
-#+(or)
-(unless *default-known-operators*
-  (setf *default-known-operators*
-        (append *logical-operators*
-                *programming-operators*
-                *definition-operators*)))
-
-
 (defun default-known-operators ()
   (plist-hash-table *default-known-operators*))
 

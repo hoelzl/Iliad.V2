@@ -10,13 +10,13 @@
 ;;; Runtime Errors
 ;;; ==============
 
-(define-condition no-state-for-situation-error (runtime-error)
+(define-condition no-state-for-situation (runtime-error)
   ((situation :reader situation :initarg :situation))
   (:report (lambda (condition stream)
              (format stream "No state for situation ~A."
                      (situation condition)))))
 
-(define-condition no-next-choice-point-error (runtime-error)
+(define-condition no-next-choice-point (runtime-error)
   ()
   (:report (lambda (condition stream)
              (declare (ignore condition))
@@ -25,14 +25,14 @@
 (define-condition online-mode-error (runtime-error)
   ())
 
-(define-condition no-backtracking-in-online-mode-error (online-mode-error)
+(define-condition no-backtracking-in-online-mode (online-mode-error)
   ()
   (:report (lambda (condition stream)
              (declare (ignore condition))
              (format stream
                      "Cannot backtrack to a previous choice point in online mode."))))
 
-(define-condition no-choice-point-creation-in-online-mode-error (online-mode-error)
+(define-condition no-choice-point-creation-in-online-mode (online-mode-error)
   ()
   (:report (lambda (condition stream)
              (declare (ignore condition))
@@ -141,7 +141,7 @@ raises an error otherwise.")
       (or state
           (cond (errorp
                  (restart-case
-                     (error 'no-state-for-situation-error :situation situation)
+                     (error 'no-state-for-situation :situation situation)
                    (provide-state (situation)
                      :test (lambda () (can-set-state-p interpreter situation))
                      :report "Provide a state for the situation."
@@ -309,7 +309,7 @@ raises an error otherwise.")
     ((interpreter interpreter) term situation)
   (when (onlinep interpreter)
     (cerror "Create the choice point anyway."
-            'no-choice-point-creation-in-online-mode-error))
+            'no-choice-point-creation-in-online-mode))
   (let ((cp (make-instance
              'choice-point
              :term term
@@ -320,7 +320,7 @@ raises an error otherwise.")
 
 (defmethod next-choice-point ((interpreter basic-interpreter))
   (if (null (choice-points interpreter))
-      (error 'no-next-choice-point-error)
+      (error 'no-next-choice-point)
       ;; This should be controllable by an execution strategy.
       (pop (choice-points interpreter))))
 
@@ -328,7 +328,7 @@ raises an error otherwise.")
   (let ((choice-point (next-choice-point interpreter)))
     (when (onlinep interpreter)
       (cerror "Backtrack anyway."
-              'no-backtracking-in-online-mode-error))
+              'no-backtracking-in-online-mode))
     (when *trace-odysseus*
       (format t "~&Backtracking.~^%"))
     (setf (interpreter-memento interpreter)
@@ -438,11 +438,6 @@ returned as first argument."))
     (cond ((null body)
 	   (interpret-1 interpreter
                         (the-empty-program-term interpreter)
-                        situation))
-          #+(or)
-	  ((null (rest body))
-	   (interpret-1 interpreter
-                        (first body)
                         situation))
 	  (t
 	   (multiple-value-bind (action rest-term new-situation)

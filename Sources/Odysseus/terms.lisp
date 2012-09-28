@@ -66,14 +66,8 @@
 
 (defmethod shared-initialize :before ((term term) slot-names &key (intern nil) (source nil))
   "All terms accept the :source and :intern keywords."
-  ;; Simply ignore the intern keyword.  If we want to signal an error when
-  ;; :INTERN is true and the term cannot be interned we have to very careful
-  ;; with the class hierarchy which is probably not worth the effort.
-  (declare (ignore slot-names intern source))
-  #+(or)
-  (when intern
-    (cerror "Create the instance without interning it."
-	    "Trying to intern term ~A." term)))
+  ;; Simply ignore the intern keyword.
+  (declare (ignore slot-names intern source)))
 
 (defgeneric declared-sort (term)
   (:documentation
@@ -526,15 +520,14 @@ or :ARG3 init-keywords is also provided."
     t))
 
 (defclass primitive-action-term (known-general-application-term)
-  (#+(or)
-   (action :accessor action :initarg :action))
+  ()
   (:documentation
    "A term describing the execution of a primitive action."))
 
 (define-primitive-action 'no-operation '())
 
 (defclass test-term (unary-term)
-  (#+(or)   (test :accessor test :initarg :test))
+  ()
   (:documentation
    "A term describing a test performed during the execution of a program."))
 
@@ -672,12 +665,6 @@ or :ARG3 init-keywords is also provided."
   ()
   (:documentation
    "Term that declare some logical concept."))
-
-;;; Don't push declarations to the context when defining them; do so
-;;; while executing the program.
-#+(or)
-(defmethod initialize-instance :after ((self declaration-term) &key context)
-  (vector-push-extend self (declarations context)))
 
 ;;; Support for incremental redefinition of declarations.  Overwrite old
 ;;; declarations if the new one is equal according to DECLARE-SAME-ENTITY.

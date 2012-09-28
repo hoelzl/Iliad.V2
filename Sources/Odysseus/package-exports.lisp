@@ -220,11 +220,11 @@
       #:prove-using-snark))
   
   (defvar *odysseus-interpreter-exports*
-    '(#:no-state-for-situation-error
-      #:no-next-choice-point-error
+    '(#:no-state-for-situation
+      #:no-next-choice-point
       #:online-mode-error
-      #:no-backtracking-in-online-mode-error
-      #:no-choice-point-creation-in-online-mode-error
+      #:no-backtracking-in-online-mode
+      #:no-choice-point-creation-in-online-mode
       #:unbound-variable-during-online-execution
 
       #:interpreter
