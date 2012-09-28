@@ -25,6 +25,20 @@
   (:documentation
    "Mixin inherited by all classes that require a name."))
 
+;;; Local Context Mixin
+;;; ===================
+
+(defclass local-context-mixin ()
+  ()
+  (:documentation
+   "Mixin that is inherited by terms that start a fresh scope for their free
+   variables."))
+
+(defmethod initialize-instance :around ((self local-context-mixin) &rest args &key context)
+  (let ((new-context (make-instance 'local-context :enclosing-context context)))
+    (remove-from-plistf args :context)
+    (apply #'call-next-method self :context new-context args)))
+
 ;;; Unique Terms
 ;;; ============
 
@@ -382,7 +396,7 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "The variables bound by BINDING-TERM."))
 
-(defclass binding-term (known-compound-term)
+(defclass binding-term (known-compound-term local-context-mixin)
   ((bound-variables
     :accessor bound-variables :initarg :bound-variables :initform '()
     :documentation "The bound variables for the term."))
@@ -512,14 +526,15 @@ or :ARG3 init-keywords is also provided."
     t))
 
 (defclass primitive-action-term (known-general-application-term)
-  ((argument :accessor action :initarg :action))
+  (#+(or)
+   (action :accessor action :initarg :action))
   (:documentation
    "A term describing the execution of a primitive action."))
 
 (define-primitive-action 'no-operation '())
 
 (defclass test-term (unary-term)
-  ((argument :accessor test :initarg :test))
+  (#+(or)   (test :accessor test :initarg :test))
   (:documentation
    "A term describing a test performed during the execution of a program."))
 
@@ -739,8 +754,7 @@ or :ARG3 init-keywords is also provided."
   (signature term))
 
 (defclass primitive-action-declaration-term (signature-declaration-term unique-term-mixin)
-  ((precondition :accessor precondition :initarg :precondition
-                 :initform nil))
+  ()
   (:documentation
    "Term describing the declaration of a primitive action."))
 
@@ -757,7 +771,7 @@ or :ARG3 init-keywords is also provided."
   (declare (ignore term))
   'declare-functional-fluent)
 
-(defclass relational-fluent-declaration-term (signature-declaration-term unique-term-mixin)
+(defclass relational-fluent-declaration-term (signature-declaration-term)
   ()
   (:documentation
    "Term describing the declaration of a relational fluent."))
@@ -821,13 +835,6 @@ or :ARG3 init-keywords is also provided."
   'declare-relation)
 
 
-(defclass unique-relation-declaration-term (relation-declaration-term unique-term-mixin)
-  ())
-
-(defmethod operator ((term unique-relation-declaration-term))
-  'declare-unique-relation)
-
-
 (defclass ordering-declaration-term (declaration-term)
   ((ordered-symbols :accessor ordered-symbols :initarg :ordered-symbols
                     :initform '()))
@@ -840,7 +847,8 @@ or :ARG3 init-keywords is also provided."
 ;;; Logical Assertions
 ;;; ------------------
 
- (defclass logical-sentence-declaration-term (declaration-term keywords-mixin)
+ (defclass logical-sentence-declaration-term
+     (declaration-term keywords-mixin local-context-mixin)
   ((sentence :accessor sentence :initarg :sentence :initform nil))
   (:documentation
    "Representation of all logical sentences that are asserted to be true."))
@@ -878,7 +886,6 @@ or :ARG3 init-keywords is also provided."
       declare-function            function-declaration-term
       declare-unique-function     unique-function-declaration-term
       declare-relation            relation-declaration-term      
-      declare-unique-relation     unique-relation-declaration-term      
       declare-ordering-greaterp   ordering-declaration-term
 
       assert                      logical-assertion-term

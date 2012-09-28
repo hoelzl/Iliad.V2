@@ -169,7 +169,7 @@ NEW-VALUE.")
     :initform (required-argument :class)
     :documentation "The class of this primitive action.")
    (action-precondition
-    :accessor action-precondition :initarg :precondition
+    :reader action-precondition :initarg :precondition
     :initform nil
     :documentation "The precondition for this action.")
    (action-signature
@@ -180,15 +180,16 @@ NEW-VALUE.")
    "The definition of a primitive action."))
 
 (defmethod initialize-instance :after
-    ((self primitive-action-definition) &key context operator action-precondition)
+    ((self primitive-action-definition) &key context operator precondition)
   (assert context (context)
           "Cannot create a primitive action definition without context.")
   (assert (and operator (symbolp operator)) (operator)
           "Cannot create a primitive action definition without operator.")
   (setf (primitive-action-definition operator context) self)
-  (when (and action-precondition (consp action-precondition))
+  (when (and precondition (consp precondition))
     (setf (slot-value self 'action-precondition)
-          (parse-into-term-representation action-precondition context))))
+          (parse-into-term-representation
+           `(assert ',precondition) context))))
 
 (defgeneric declare-primitive-action (operator context &optional class-name)
   (:documentation
@@ -196,9 +197,11 @@ NEW-VALUE.")
 primitive-action definition for OPERATOR in CONTEXT.")
   (:method ((operator symbol) (context compilation-context)
             &optional (class-name (symbolicate operator '#:-term)))
-    (setf (primitive-action-definition operator context)
-          (make-instance 'primitive-action-definition
-                         :operator operator :class class-name :context context))))
+    (cerror "Continue anyway."
+            "Declaring undefined primitive action."
+            (setf (primitive-action-definition operator context)
+                  (make-instance 'primitive-action-definition
+                    :operator operator :class class-name :context context)))))
 
 (defun define-primitive-action (operator signature
                                 &key (class-name  (symbolicate operator '#:-term))

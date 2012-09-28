@@ -57,11 +57,12 @@
       (format t "~&Running example ~A in mode ~A.~%"
 	      (name example) execution-mode)
       (format t "~&Source code: ~25T~:W~%" (term example))
-      (let ((result (apply 'interpret
-                           (full-source-code example)
-			   :interpreter interpreter
-			   (keys example))))
-	(format t "~&Result: ~:W~2&" result)))))
+      (multiple-value-bind (result success?)
+          (apply 'interpret
+                 (full-source-code example)
+                 :interpreter interpreter
+                 (keys example))
+	(format t "~&~:[Aborted with error~;Result~]: ~:W~2&" success? result)))))
 
 (defun run-examples (examples &optional (execution-mode :online))
   (mapc (lambda (example)

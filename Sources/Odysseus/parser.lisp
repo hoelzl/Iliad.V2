@@ -113,12 +113,13 @@ accepting all keyword arguments without parsing any of them."
   "Parse the binding list and then call the next method on the rest of the
 argument list."
   (let* ((binding-list (ensure-list (first arguments)))
+         #+(or)
          (new-context (make-instance 'local-context :enclosing-context context))
          (bound-variables (mapcar (lambda (binding)
-                                    (parse-binding binding term new-context))
+                                    (parse-binding binding term context))
                                   binding-list)))
     (setf (bound-variables term) bound-variables)
-    (call-next-method term (rest arguments) new-context)))
+    (call-next-method term (rest arguments) context)))
 
 (defmethod parse-arguments-for-term :after ((term declaration-term) arguments context)
   "Add TERM to the declarations of CONTEXT.  This has to happen after the
@@ -277,5 +278,5 @@ Otherwise return an instance of UNKNOWN-GENERAL-APPLICATION-TERM."
                      (t
                       (make-instance 'unknown-general-application-term
                                      :operator operator :context context :source exp)))))
-    (parse-arguments-for-term term (rest exp) context)
+    (parse-arguments-for-term term (rest exp) (context term))
     term))

@@ -11,6 +11,9 @@
   (:documentation
    "Convert TERM into an S-expression.")
 
+  (:method ((term term))
+    :unreadable-term)
+
   (:method ((term variable-term))
     (unique-name term))
 
@@ -86,6 +89,11 @@
 (defmethod print-object ((term variable-term) stream)
   (print-unreadable-object (term stream :type t :identity t)
     (format stream "~A" (name term))))
+
+(defmethod print-object ((term primitive-action-definition) stream)
+  (print-unreadable-object (term stream :type t :identity t)
+    (format stream "~A~:[~;~:*~W~]" (operator term) (action-precondition term))))
+
 
 (defgeneric free-variables (term)
   (:documentation
@@ -369,8 +377,6 @@
              (with-slots (declaration) condition
                (format stream "~W is not a valid declaration for Snark."
                        declaration)))))
-                     
-  
 
 (defgeneric process-declaration-for-snark (declaration)
   (:documentation
@@ -386,6 +392,11 @@
   (:method ((context compilation-context))
     (iterate (for declaration in-sequence (declarations context))
       (process-declaration-for-snark declaration))
+    (iterate (for (nil action) in-hashtable (primitive-actions context))
+      (let ((precondition (action-precondition action)))
+        (when precondition
+          (format t "~&Processing ~A.~%" precondition)
+          (process-declaration-for-snark precondition))))
     (iterate (for declaration in-sequence (make-unique-names-axioms context))
       (process-declaration-for-snark declaration))
     :snark-setup-completed))

@@ -405,9 +405,9 @@ returned as first argument."))
                             (rest answer))))
              (when new-terms
                (setf term (substitute-terms new-terms free-variables term)
-                       (stored-actions interpreter)
-                       (mapcar (lambda (action)
-                                 (substitute-terms new-terms free-variables action))
+                     (stored-actions interpreter)
+                     (mapcar (lambda (action)
+                               (substitute-terms new-terms free-variables action))
                              (stored-actions interpreter)))
                (unless (onlinep interpreter)
                  (setf situation (substitute-terms new-terms free-variables situation))))
@@ -439,6 +439,7 @@ returned as first argument."))
 	   (interpret-1 interpreter
                         (the-empty-program-term interpreter)
                         situation))
+          #+(or)
 	  ((null (rest body))
 	   (interpret-1 interpreter
                         (first body)
@@ -532,24 +533,31 @@ returned as first argument."))
 ;;; Multi-Step Interpretation
 ;;; =========================
 
+(defvar *suppress-interpretation-errors* t)
+
 (defun interpret (term &key (interpreter (default-interpreter))
                             (situation (make-instance 'initial-situation))
-                            (error-value :execution-failed))
+                            (error-value nil))
   (labels ((recurse (term situation)
              (multiple-value-bind (action rest-term new-situation)
                  (interpret-1 interpreter term situation)
                (unless (typep action 'no-operation-term)
                  (assert (onlinep interpreter) ()
                          "Cannot execute actions while the interpreter is offline.")
+                 (assert (null (stored-actions interpreter)) ()
+                         "Should not have stored actions when trying to execute an action.")
                  (execute-stored-actions interpreter))
                (execute-primitive-action interpreter action)
                (cond ((is-final-term-p rest-term)
                       (execute-stored-actions interpreter)
-                      (to-sexpr new-situation))
+                      (values (to-sexpr new-situation) t))
                      (t
                       (recurse rest-term new-situation))))))
-    (handler-case
-        (recurse term situation)
-      (runtime-error ()
-        error-value))))
+    (if *suppress-interpretation-errors*
+        (handler-case
+            (recurse term situation)
+          (runtime-error (condition)
+            (values (or error-value (class-name (class-of condition)))
+                    nil)))
+        (recurse term situation))))
       

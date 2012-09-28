@@ -1,6 +1,7 @@
 *~
 .#*
 *#
+*.dx32fsl
 *.dx64fsl
 *.fas
 *.fasl

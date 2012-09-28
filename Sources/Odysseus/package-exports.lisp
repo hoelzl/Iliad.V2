@@ -123,6 +123,7 @@
       #:arity
       #:declaration-term
       #:keywords-mixin #:keywords
+      #:local-context-mixin
       #:unique-term-mixin
       #:declared-sort #:successor-state
       #:named-declaration-term
@@ -140,7 +141,6 @@
       #:function-declaration-term
       #:unique-function-declaration-term
       #:relation-declaration-term
-      #:unique-relation-declaration-term
       #:ordering-declaration-term #:ordered-symbols
 
       #:logical-sentence-declaration-term
@@ -225,6 +225,7 @@
       #:online-mode-error
       #:no-backtracking-in-online-mode-error
       #:no-choice-point-creation-in-online-mode-error
+      #:unbound-variable-during-online-execution
 
       #:interpreter
       #:reset-interpreter
