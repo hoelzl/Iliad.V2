@@ -18,16 +18,23 @@
   (:documentation
    "Mixin inherited by all classes that have names."))
 
-(defmethod print-object ((self name-mixin) stream)
-  (print-unreadable-object (self stream :type t :identity t)
-    (format stream "~A" (name self))))
-
 (defclass required-name-mixin (name-mixin)
   ((name
     :initform (required-argument :name)
     :documentation "The name of the entity that inherits this mixin."))
   (:documentation
    "Mixin inherited by all classes that require a name."))
+
+;;; Unique Terms
+;;; ============
+
+;;; Terms that mix in UNIQUE-TERM-MIXIN get autamatically generated unique
+;;; names axioms.
+
+(defclass unique-term-mixin ()
+  ()
+  (:documentation
+   "Mixin for terms for which unique name axioms should be generated."))
 
 
 ;;; Terms
@@ -129,6 +136,15 @@
   (make-instance 'variable-term
                  :name name :sort sort :context context :source name
                  :intern intern :is-bound-p is-bound-p))
+
+(defun make-anonymous-variable-term (sort context &key (is-bound-p nil))
+  (let* ((name (make-symbol (format nil "?_V~A.~A"
+                                    (incf *unique-variable-counter*)
+                                    sort)))
+         (result (make-variable-term
+                  name sort context :is-bound-p is-bound-p)))
+    (setf (slot-value result 'unique-name) name)
+    result))
 
 (defclass atomic-term (term)
   ()
@@ -438,7 +454,7 @@ or :ARG3 init-keywords is also provided."
    "Representation of an universally quantified statement."))
 
 (defmethod operator ((term universal-quantification-term))
-  'foreach)
+  'forall)
 
 (defclass existential-quantification-term (quantification-term)
   ()
@@ -663,11 +679,6 @@ or :ARG3 init-keywords is also provided."
    this means that they declare the same kind of entity with the same name,
    not that the declarations are the same."))
 
-(defclass unique-term-mixin ()
-  ()
-  (:documentation
-   "Mixin for terms for which unique name axioms should be generated."))
-
 (defclass keywords-mixin ()
   ((keywords :accessor keywords :initarg :keywords
              :initform '()))
@@ -727,7 +738,7 @@ or :ARG3 init-keywords is also provided."
 (defmethod declared-sort ((term signature-declaration-term))
   (signature term))
 
-(defclass primitive-action-declaration-term (signature-declaration-term)
+(defclass primitive-action-declaration-term (signature-declaration-term unique-term-mixin)
   ((precondition :accessor precondition :initarg :precondition
                  :initform nil))
   (:documentation
@@ -737,7 +748,7 @@ or :ARG3 init-keywords is also provided."
   (declare (ignore term))
   'declare-primitive-action)
 
-(defclass functional-fluent-declaration-term (signature-declaration-term)
+(defclass functional-fluent-declaration-term (signature-declaration-term unique-term-mixin)
   ()
   (:documentation
    "Term describing the declaration of a functional fluent."))
@@ -746,7 +757,7 @@ or :ARG3 init-keywords is also provided."
   (declare (ignore term))
   'declare-functional-fluent)
 
-(defclass relational-fluent-declaration-term (signature-declaration-term)
+(defclass relational-fluent-declaration-term (signature-declaration-term unique-term-mixin)
   ()
   (:documentation
    "Term describing the declaration of a relational fluent."))
@@ -775,11 +786,15 @@ or :ARG3 init-keywords is also provided."
   (:documentation
    "Declares a constant for which unique names axioms should be generated."))
 
+(defmethod operator ((term unique-constant-declaration-term))
+  'declare-unique-constant)
+
 (defclass arity-declaration-term (named-declaration-term)
   ((arity :accessor arity :initarg :arity
           :initform -1))
   (:documentation
    "Declaration of a term that has an arity."))
+
 
 (defclass function-declaration-term (arity-declaration-term)
   ()
@@ -789,6 +804,14 @@ or :ARG3 init-keywords is also provided."
 (defmethod operator ((term function-declaration-term))
   'declare-function)
 
+
+(defclass unique-function-declaration-term (function-declaration-term unique-term-mixin)
+  ())
+
+(defmethod operator ((term unique-function-declaration-term))
+  'declare-unique-function)
+
+
 (defclass relation-declaration-term (arity-declaration-term)
   ()
   (:documentation
@@ -796,6 +819,14 @@ or :ARG3 init-keywords is also provided."
 
 (defmethod operator ((term relation-declaration-term))
   'declare-relation)
+
+
+(defclass unique-relation-declaration-term (relation-declaration-term unique-term-mixin)
+  ())
+
+(defmethod operator ((term unique-relation-declaration-term))
+  'declare-unique-relation)
+
 
 (defclass ordering-declaration-term (declaration-term)
   ((ordered-symbols :accessor ordered-symbols :initarg :ordered-symbols
@@ -842,8 +873,12 @@ or :ARG3 init-keywords is also provided."
       declare-subsort             subsort-declaration-term
       declare-sorts-incompatible  sorts-incompatible-declaration-term
       declare-constant            constant-declaration-term
+      declare-unique-name         unique-constant-declaration-term
+      declare-unique-constant     unique-constant-declaration-term
       declare-function            function-declaration-term
+      declare-unique-function     unique-function-declaration-term
       declare-relation            relation-declaration-term      
+      declare-unique-relation     unique-relation-declaration-term      
       declare-ordering-greaterp   ordering-declaration-term
 
       assert                      logical-assertion-term

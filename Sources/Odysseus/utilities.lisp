@@ -66,6 +66,11 @@
       thing
       (list 'quote thing)))
 
+(defun wrap-in-forall (variables term)
+  (if variables
+      (list 'forall variables term)
+      term))
+
 ;;; Helper Methods for the MOP
 ;;; ==========================
 

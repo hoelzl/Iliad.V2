@@ -352,33 +352,3 @@ fluent definition for OPERATOR in CONTEXT.")
                      :class class-name
                      :successor-state ',successor-state
                      :context context)))))
-
-
-;;; Interaction with Snark.
-;;; ======================
-
-(define-condition invalid-declaration-type (runtime-error)
-  ((declaration :initarg :declaration
-                :initform (required-argument :declaration)))
-  (:report (lambda (condition stream)
-             (with-slots (declaration) condition
-               (format stream "~W is not a valid declaration for Snark."
-                       declaration)))))
-                     
-  
-
-(defgeneric process-declaration-for-snark (declaration)
-  (:documentation
-   "Process DECLARATION so that the declared entity exists in Snark's
-   theory.")
-  (:method (declaration)
-    (cerror "Continue without processing the declaration."
-            'invalid-declaration-type :declaration declaration)))
-
-(defgeneric set-up-snark (compilation-context)
-  (:documentation
-   "Set up Snark to prove things in COMPILATION-CONTEXT.")
-  (:method ((context compilation-context))
-    (iterate (for declaration in-sequence (declarations context))
-      (process-declaration-for-snark declaration))
-    :snark-setup-completed))

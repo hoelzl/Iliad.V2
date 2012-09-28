@@ -10,6 +10,8 @@
 (defpackage #:odysseus-utilities
   (:use #:common-lisp #:alexandria #:iterate)
   (:nicknames #:utils)
+  (:import-from #:snark-lisp
+                #:forall #:exists #:not #:iff)
   (:export . #.*odysseus-utilities-exports*))
 
 (defpackage #:odysseus-syntax

@@ -15,7 +15,8 @@
       ;; MOP
       #:define-method
       ;; General utilities
-      #:unquote #:wrap-in-quote
+      #:unquote
+      #:wrap-in-quote #:wrap-in-forall
       #:defglobal
       #:gethash*
       ;; Three-valued logic
@@ -66,12 +67,16 @@
       #:local-context #:enclosing-context #:local-variables
       
       #:set-up-snark
-      #:process-declaration-for-snark))
+      #:process-declaration-for-snark
+      #:variables-and-term-for-universal-quantification
+      #:make-unique-names-axiom
+      #:make-unique-names-axioms))
   
   (defvar *odysseus-term-exports*
     '(#:term #:source
       #:variable-term #:unique-name #:variable-sort #:is-bound-p
       #:make-variable-term 
+      #:make-anonymous-variable-term 
       #:atomic-term
       #:primitive-term #:value
       #:functor-term
@@ -118,6 +123,7 @@
       #:arity
       #:declaration-term
       #:keywords-mixin #:keywords
+      #:unique-term-mixin
       #:declared-sort #:successor-state
       #:named-declaration-term
       #:sort-declaration-term
@@ -129,9 +135,12 @@
       #:functional-fluent-declaration-term
       #:relational-fluent-declaration-term
       #:constant-declaration-term
+      #:unique-constant-declaration-term
       #:arity-declaration-term
       #:function-declaration-term
+      #:unique-function-declaration-term
       #:relation-declaration-term
+      #:unique-relation-declaration-term
       #:ordering-declaration-term #:ordered-symbols
 
       #:logical-sentence-declaration-term
@@ -172,8 +181,11 @@
       #:declare-sorts-incompatible
       #:declare-ordering-greaterp
       #:declare-constant
+      #:declare-unique-constant #:declare-unique-name
       #:declare-function
+      #:declare-unique-function
       #:declare-relation
+      #:declare-unique-relation
       #:assert #:assert-rewrite
       #:assume
       
@@ -197,6 +209,8 @@
       #:process-declaration-for-parsing
       #:parse-arguments-for-term
       #:parse-binding
+      #:destructure-variable-name
+      #:parse-variable-term
       #:parse-into-term-representation))
   
   (defvar *odysseus-snark-exports*

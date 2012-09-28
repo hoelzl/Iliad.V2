@@ -7,10 +7,6 @@
 
 (in-package #:odysseus-user)
 
-;; TODO: Generate DECLARE-FUNCTION calls from DECLARE-FUNCTIONAL-FLUENT
-;;       Generate DECLARE-RELATION calls from DELCARE-RELATIONAL-FLUENT
-;;       Generate unique names axioms
-
 (defvar *is-rested-p-axiom*
   '(forall ((p :sort person)
             (a :sort action)
@@ -29,28 +25,20 @@
     (declare-sorts-incompatible 'situation 'action 'object)
   
     ;; Situations
-    (declare-constant 's0 :sort 'situation)
-    (declare-function 'do 2
-                      :sort '(situation action situation)
-  		      :injective t)
+    (declare-unique-constant 's0 :sort 'situation)
+    (declare-unique-function 'do 2
+                             :sort '(situation action situation)
+                             :injective t)
 
     ;; Objects
     (declare-subsort 'person 'object)
-    (declare-constant 'annabelle :sort 'person :constructor nil)
-    (declare-constant 'lenz :sort 'person :constructor nil)
-    (declare-constant 'matthias :sort 'person :constructor nil)
-    (assert '(not (= annabelle lenz))
-                   :supported nil)
-    (assert '(not (= annabelle matthias))
-                   :supported nil)
-    (assert '(not (= lenz matthias))
-                   :supported nil)
+
+    (declare-unique-constant 'annabelle :sort 'person :constructor nil)
+    (declare-unique-constant 'lenz :sort 'person :constructor nil)
+    (declare-unique-constant 'matthias :sort 'person :constructor nil)
     
     ;; Fluent
     (declare-relational-fluent 'is-rested-p '(person situation))
-    #+(or)
-    (declare-relation 'is-rested-p 2
-                      :sort '(person situation))
 
     (declare-primitive-action 'eat '(action person))
     (declare-primitive-action 'work '(action person))
@@ -60,35 +48,9 @@
                           (is-rested-p ?p.person ?s.situation)))
   
     ;; Actions
-    (declare-function 'no-operation 0
-                      :sort '(action)
-                      :injective t)
-    (assert '(forall ((p1 :sort person)
-                      (p2 :sort person))
-                     (not (= (work p2) (sleep p1)))))
-    (assert '(forall ((p1 :sort person)
-                      (p2 :sort person))
-                     (not (= (work p2) (eat p1)))))
-    (assert '(forall ((p1 :sort person)
-                      (p2 :sort person))
-                     (not (= (work p2) (celebrate p1)))))
-    (assert '(forall ((p1 :sort person)
-                      (p2 :sort person))
-                     (not (= (eat p2) (sleep p1)))))
-    (assert '(forall ((p1 :sort person)
-                      (p2 :sort person))
-                     (not (= (eat p2) (celebrate p1)))))
-    (assert '(forall ((p1 :sort person)
-                      (p2 :sort person))
-                     (not (= (sleep p2) (celebrate p1)))))
-    (assert '(forall ((p :sort person))
-                     (not (= (no-operation) (sleep p)))))
-    (assert '(forall ((p :sort person))
-                     (not (= (no-operation) (work p)))))
-    (assert '(forall ((p :sort person))
-                     (not (= (no-operation) (eat p)))))
-    (assert '(forall ((p :sort person))
-                     (not (= (no-operation) (celebrate p)))))
+    (declare-unique-function 'no-operation 0
+                             :sort '(action)
+                             :injective t)
   
     (declare-ordering-greaterp 'do 'work 'sleep 'annabelle 'lenz 'matthias)
     
@@ -230,7 +192,7 @@
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09e (:hidden? t)
+(defexample interpret-09e (:set-up-function 'set-up-ewsc-theory :hidden? t)
   (search
    (eat ?p.person)
    (work ?p.person)
@@ -294,7 +256,7 @@
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09f (:hidden? t)
+(defexample interpret-09f (:set-up-function 'set-up-ewsc-theory :hidden? t)
   (search
    (eat ?p.person)
    (eat ?p.person)
@@ -358,7 +320,7 @@
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09g (:hidden? t)
+(defexample interpret-09g (:set-up-function 'set-up-ewsc-theory :hidden? t)
   (search
    (sleep ?p.person)
    (eat ?p.person)
@@ -378,53 +340,9 @@
    (eat ?p.person)
    (eat ?p.person)
    (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
    (celebrate ?p.person)))
 
-
-(defexample interpret-09h (:hidden? t)
+(defexample interpret-09h (:set-up-function 'set-up-ewsc-theory :hidden? t)
   (search
    (work ?p.person)
    (eat ?p.person)
@@ -447,40 +365,14 @@
    (eat ?p.person)
    (eat ?p.person)
    (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-09i (:set-up-function 'set-up-ewsc-theory :hidden? t)
+  (search
+   (choose
+    (work ?p.person)
+    (eat ?p.person)
+    (sleep ?p.person))
    (eat ?p.person)
    (eat ?p.person)
    (eat ?p.person)

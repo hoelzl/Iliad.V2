@@ -329,6 +329,7 @@ raises an error otherwise.")
     (when (onlinep interpreter)
       (cerror "Backtrack anyway."
               'no-backtracking-in-online-mode-error))
+    (format t "~&Backtracking.~^%")
     (setf (interpreter-memento interpreter)
           (interpreter-memento choice-point))
     (interpret-1 interpreter (term choice-point) (situation choice-point))))
@@ -479,6 +480,8 @@ returned as first argument."))
       (let ((choice-points
               (mapcar (lambda (choice)
                         (make-choice-point interpreter choice situation))
+                      ;;; FIXME: This is wrong!  We need to store a possible
+                      ;;; continuation after executing the body.
                       (if *permute-offline-choice*
                           (shuffle (body term))
                           (reverse (body term))))))

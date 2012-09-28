@@ -46,6 +46,13 @@
    "A mixin that provides storage and methods for obtaining the unique terms
    of a context."))
 
+(defmethod add-unique-term (term (context unique-terms-mixin))
+  (let ((position (position term (unique-terms context) 
+                            :test (lambda (lhs rhs)
+                                    (eql (name lhs) (name rhs))))))
+    (if position
+        (setf (aref (unique-terms context) position) term)
+        (vector-push-extend term (unique-terms context)))))
 
 ;;; Compilation units
 ;;; =================
@@ -75,7 +82,8 @@
 (defun default-primitive-action-names ()
   *default-primitive-action-names*)
 
-(defclass compilation-unit (compilation-context singleton-terms-mixin)
+(defclass compilation-unit
+    (compilation-context singleton-terms-mixin unique-terms-mixin)
   ((declarations 
     :accessor declarations :initarg :declarations
     :initform (make-array '(10) :adjustable t :fill-pointer 0)

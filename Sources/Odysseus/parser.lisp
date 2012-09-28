@@ -23,9 +23,13 @@ question mark."
    "Process a declaration so that the parser can use it for processing
    the rest of the program.")
 
-  (:method ((term term) interpreter)
-    (declare (ignore term interpreter))
+  (:method ((term term) context)
+    (declare (ignore term context))
     :do-nothing)
+
+  (:method :after ((term unique-term-mixin) context)
+    (add-unique-term term context))
+
   ;; TODO: We might want to do something along the following lines.  For now
   ;; we use a simple implementation that always calls DEFINE-PRIMITIVE-ACTION.
   #+(or)
@@ -156,31 +160,30 @@ arguments are passed, otherwise the name of TERM will not be set."
 
 (defmethod parse-arguments-for-term
     ((term logical-sentence-declaration-term) arguments context)
-  (setf (sentence term) (unquote (first arguments)))
+  (setf (sentence term) 
+        (parse-into-term-representation (unquote (first arguments)) context))
   (setf (keywords term) (mapcar 'unquote (rest arguments))))
 
+(defun destructure-variable-name (symbol)
+  (let* ((name (symbol-name symbol))
+         (package (symbol-package symbol)) ;; TODO: What should the package be?
+         (start-index (if (eql (aref name 0) #\?) 1 0))
+         (dot-index (position #\. name))
+         (real-name (intern (subseq name start-index dot-index) package))
+         (sort-name (if (and dot-index (< dot-index (1- (length name))))
+                        (intern (subseq name (1+ dot-index)) package)
+                        t)))
+    (values real-name sort-name)))
 
-(defmethod parse-into-term-representation ((term term) (context compilation-context))
-  "When re-parsing an already parsed term, return it unchanged.  But only if
-the new context equals the one in which it was originally parsed."
-  (assert (eql (context term) context) ()
-          "Cannot parse term ~W in context ~W."
-          term context)
-  term)
 
 (defgeneric parse-variable-term (exp compilation-context)
   (:documentation
    "Parse EXP as a VARIABLE-TERM.")
 
   (:method ((exp symbol) (context compilation-context))
-    (let* ((name (symbol-name exp))
-           (start-index (if (eql (aref name 0) #\?) 1 0))
-           (dot-index (position #\. name))
-           (real-name (subseq name start-index dot-index))
-           (sort-name (if (and dot-index (< dot-index (1- (length name))))
-                          (subseq name (1+ dot-index))
-                          "T")))
-      (make-variable-term real-name sort-name context)))
+    (multiple-value-bind (name sort)
+        (destructure-variable-name exp)
+      (make-variable-term name sort context)))
 
   (:method ((exp cons) (context compilation-context))
     (destructuring-bind (name &key sort &allow-other-keys) exp
@@ -193,7 +196,20 @@ the new context equals the one in which it was originally parsed."
                       'incompatible-sort-declarations
                       :thing exp (declared-sort var) sort)
               (setf (declared-sort var) sort)))
-        var))))
+        var)))
+
+  (:method ((exp variable-term) (context compilation-context))
+    (setf (context exp) context)
+    exp))
+
+
+(defmethod parse-into-term-representation ((term term) (context compilation-context))
+  "When re-parsing an already parsed term, return it unchanged.  But only if
+the new context equals the one in which it was originally parsed."
+  (assert (eql (context term) context) ()
+          "Cannot parse term ~W in context ~W."
+          term context)
+  term)
 
 (defmethod parse-into-term-representation ((exp symbol) (context compilation-context))
   "Parse a single symbol.
@@ -205,8 +221,11 @@ If neither of these cases apply, return a primitive term."
 	((starts-with-question-mark-p exp)
 	 (parse-variable-term exp context))
 	(t
-	 (make-instance 'primitive-term
-                        :value exp :context context :source exp))))
+         (multiple-value-bind (name sort)
+             (destructure-variable-name exp)
+           (or (lookup-variable name sort context nil)
+               (make-instance 'primitive-term
+                 :value exp :context context :source exp))))))
 
 (defmethod parse-into-term-representation ((exp number) (context compilation-context))
   "Return a number term with value EXP."

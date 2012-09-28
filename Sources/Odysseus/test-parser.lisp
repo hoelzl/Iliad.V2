@@ -158,14 +158,14 @@
                                   :exactly-two-terms-allowed t)
     (test-parse-binary-connective '(are-equivalent ?x ?y) 'iff cc
                                   :exactly-two-terms-allowed t)
-    (test-parse-quantification-1 '(foreach ?x (f ?x)) 'foreach cc)
-    (test-parse-quantification-1 '(each ?x (f ?x)) 'foreach cc)
-    (test-parse-quantification-1 '(forall ?x (f ?x)) 'foreach cc)
+    (test-parse-quantification-1 '(foreach ?x (f ?x)) 'forall cc)
+    (test-parse-quantification-1 '(each ?x (f ?x)) 'forall cc)
+    (test-parse-quantification-1 '(forall ?x (f ?x)) 'forall cc)
     (test-parse-quantification-1 '(exists ?x (f ?x)) 'exists cc)
     (test-parse-quantification-1 '(exist ?x (f ?x)) 'exists cc)
-    (test-parse-quantification-2 '(foreach (?x ?y) (f ?x ?y))  'foreach cc)
+    (test-parse-quantification-2 '(foreach (?x ?y) (f ?x ?y))  'forall cc)
     (test-parse-quantification-2 '(exists (?x ?y) (f ?x ?y))  'exists cc)
-    (test-parse-quantification-2 '(foreach ((?x) (?y)) (f ?x ?y))  'foreach cc)
+    (test-parse-quantification-2 '(foreach ((?x) (?y)) (f ?x ?y))  'forall cc)
     (test-parse-quantification-2 '(exists ((?x) (?y)) (f ?x ?y))  'exists cc)))
 
 

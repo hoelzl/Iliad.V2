@@ -66,7 +66,7 @@
 
   (:method ((term logical-sentence-declaration-term))
     (list* (operator term)
-           (wrap-in-quote (sentence term))
+           (wrap-in-quote (to-sexpr (sentence term)))
            (mapcar #'wrap-in-quote (keywords term))))
 
   (:method ((situation initial-situation))
@@ -78,18 +78,14 @@
          ,(to-sexpr (previous-situation situation)))))
 
 
+
+(defmethod print-object ((self term) stream)
+  (print-unreadable-object (self stream :type t)
+    (format stream "~W" (to-sexpr self))))
+
 (defmethod print-object ((term variable-term) stream)
   (print-unreadable-object (term stream :type t :identity t)
     (format stream "~A" (name term))))
-
-(defmethod print-object ((term application-term) stream)
-  (print-unreadable-object (term stream :type t :identity t)
-    (format stream "~:W" (to-sexpr term))))
-
-(defmethod print-object ((self body-term) stream)
-  (print-unreadable-object (self stream :type t)
-    (format stream "~:W" (to-sexpr self))))
-
 
 (defgeneric free-variables (term)
   (:documentation
@@ -234,15 +230,21 @@
   :declare-ordering-greaterp)
 
 (defmethod process-declaration-for-snark ((declaration logical-assertion-term))
-  (apply #'snark::assert (sentence declaration) (keywords declaration))
+  (apply #'snark::assert
+         (to-sexpr (sentence declaration))
+         (keywords declaration))
   :assert)
 
 (defmethod process-declaration-for-snark ((declaration logical-assumption-term))
-  (apply #'snark:assume (sentence declaration) (keywords declaration))
+  (apply #'snark:assume
+         (to-sexpr (sentence declaration))
+         (keywords declaration))
   :assume)
 
 (defmethod process-declaration-for-snark ((declaration rewrite-assertion-term))
-  (apply #'snark:assert-rewrite (sentence declaration) (keywords declaration))
+  (apply #'snark:assert-rewrite
+         (to-sexpr (sentence declaration))
+         (keywords declaration))
   :assert-rewrite)
 
 (defmethod process-declaration-for-snark ((declaration primitive-action-declaration-term))
@@ -273,3 +275,115 @@
            (keywords declaration)))
   :fluent/declare-function)
 
+;;; Generating Unique Names Axioms
+;;; ==============================
+
+(defgeneric variables-and-term-for-universal-quantification (term context)
+  (:documentation
+   "Returns a list of VARIABLE-TERMs that can be used to quantify over all
+   variables of TERM in CONTEXT.")
+
+  (:method ((term variable-term) (context compilation-context))
+    (values '() (name term)))
+
+  (:method ((term signature-declaration-term) (context compilation-context))
+    ;; The first element of the signature is the return value.
+    (let* ((signature (rest (signature term)))
+           (vars (mapcar (lambda (sort)
+                           (make-anonymous-variable-term sort context))
+                         signature)))
+      (values vars
+              (cons (name term) vars))))
+
+  (:method ((term relational-fluent-declaration-term) (context compilation-context))
+    ;; The signature of relations contains only the argument types.
+    (let* ((signature (signature term))
+           (vars (mapcar (lambda (sort)
+                           (make-anonymous-variable-term sort context))
+                         signature)))
+      (values vars
+              (cons (name term) vars))))
+
+  (:method ((term constant-declaration-term) (context compilation-context))
+    (values '()
+            (name term)))
+
+  (:method ((term function-declaration-term) (context compilation-context))
+    (let* ((signature (declared-sort term))
+           (vars (if (consp signature)
+                     (mapcar (lambda (sort)
+                               (make-anonymous-variable-term sort context))
+                             (rest signature))
+                     '())))
+      (values vars
+              (cons (name term) vars))))
+  
+  (:method ((term relation-declaration-term) (context compilation-context))
+    (let* ((signature (declared-sort term))
+           (vars (if (consp signature)
+                     (mapcar (lambda (sort)
+                               (make-anonymous-variable-term sort context))
+                             signature)
+                     (list (make-anonymous-variable-term signature context)))))
+      (values vars
+              (cons (name term) vars)))))
+
+(defgeneric make-unique-names-axiom (lhs rhs context)
+  (:documentation
+   "Returns the unique names axiom for LHS and RHS in CONTEXT, i.e., an
+   assertion that for all possible arguments, LHS and RHS are not equal.")
+
+  (:method ((lhs term) (rhs term) (context compilation-context))
+    (multiple-value-bind (lhs-vars lhs-term)
+        (variables-and-term-for-universal-quantification lhs context)
+      (multiple-value-bind (rhs-vars rhs-term)
+          (variables-and-term-for-universal-quantification rhs context)
+        (let ((vars (concatenate 'list lhs-vars rhs-vars)))
+          (parse-into-term-representation
+           `(assert
+             ,(wrap-in-forall vars `(not (= ,lhs-term ,rhs-term))))
+           context))))))
+
+(defgeneric make-unique-names-axioms (compilation-context)
+  (:method ((context compilation-context))
+    (let* ((terms (unique-terms context))
+           (length (length terms)))
+      (iterate outer
+        (for i from 0 below (1- length))
+        (iterate
+          (for j from (1+ i) below length)
+          (in outer 
+              (collect
+                  (make-unique-names-axiom
+                   (aref terms i) (aref terms j) context))))))))
+
+;;; Interaction with Snark.
+;;; ======================
+
+(define-condition invalid-declaration-type (runtime-error)
+  ((declaration :initarg :declaration
+                :initform (required-argument :declaration)))
+  (:report (lambda (condition stream)
+             (with-slots (declaration) condition
+               (format stream "~W is not a valid declaration for Snark."
+                       declaration)))))
+                     
+  
+
+(defgeneric process-declaration-for-snark (declaration)
+  (:documentation
+   "Process DECLARATION so that the declared entity exists in Snark's
+   theory.")
+  (:method (declaration)
+    (cerror "Continue without processing the declaration."
+            'invalid-declaration-type :declaration declaration)))
+
+(defgeneric set-up-snark (compilation-context)
+  (:documentation
+   "Set up Snark to prove things in COMPILATION-CONTEXT.")
+  (:method ((context compilation-context))
+    (iterate (for declaration in-sequence (declarations context))
+      (process-declaration-for-snark declaration))
+    (iterate (for declaration in-sequence (make-unique-names-axioms context))
+      (process-declaration-for-snark declaration))
+    :snark-setup-completed))
