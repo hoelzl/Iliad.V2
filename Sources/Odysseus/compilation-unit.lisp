@@ -131,6 +131,7 @@
 	    (t nil)))))
 
 (defmethod (setf lookup-variable) (new-value name sort (context compilation-unit))
+  (declare (ignore sort))
   (check-type new-value variable-term)
   (let ((hash-table (slot-value context 'variable-hash-table)))
     (setf (gethash name hash-table) new-value)))
@@ -199,6 +200,7 @@
                   nil))))))
 
 (defmethod (setf lookup-variable) (new-value name sort (context local-context))
+  (declare (ignore sort))
   (let ((binding (assoc name (local-variables context))))
     (cond (binding
            (setf (cdr binding) new-value))

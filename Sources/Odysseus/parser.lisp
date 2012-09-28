@@ -132,30 +132,36 @@ arguments are passed, otherwise the name of TERM will not be set."
 ;; evaluated by the interpreter.  This is so that we don't have to fix all
 ;; examples when the interpreter is complete enough.
 (defmethod parse-arguments-for-term ((term named-declaration-term) arguments context)
+  (declare (ignore context))
   (setf (name term) (unquote (first arguments)))
   (setf (keywords term) (mapcar 'unquote (rest arguments))))
 
 (defmethod parse-arguments-for-term ((term subsort-declaration-term) arguments context)
+  (declare (ignore context))  
   (setf (name term) (unquote (first arguments)))
   (setf (supersort term) (unquote (second arguments)))
   (setf (keywords term) (mapcar 'unquote (cddr arguments))))
 
 (defmethod parse-arguments-for-term
     ((term sorts-incompatible-declaration-term) arguments context)
+  (declare (ignore context))
   (setf (sorts term) (mapcar 'unquote arguments)))
 
 (defmethod parse-arguments-for-term ((term arity-declaration-term) arguments context)
+  (declare (ignore context))
   (setf (name term) (unquote (first arguments)))
   (setf (arity term) (unquote (second arguments)))
   (setf (keywords term) (mapcar 'unquote (cddr arguments))))
 
 (defmethod parse-arguments-for-term ((term signature-declaration-term) arguments context)
+  (declare (ignore context))
   (setf (name term) (unquote (first arguments)))
   (setf (signature term) (unquote (second arguments)))
   (setf (keywords term) (mapcar 'unquote (cddr arguments))))
 
 (defmethod parse-arguments-for-term
     ((term ordering-declaration-term) arguments context)
+  (declare (ignore context))
   (setf (ordered-symbols term) (mapcar 'unquote arguments)))
 
 (defmethod parse-arguments-for-term
