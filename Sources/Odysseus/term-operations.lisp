@@ -261,7 +261,7 @@
   (let ((signature (signature declaration)))
     (apply #'snark:declare-relation
            (name declaration)
-           (1- (length signature))
+           (length signature)
            :sort signature
            (keywords declaration)))
   :fluent/declare-relation)
@@ -297,6 +297,7 @@
 
   (:method ((term relational-fluent-declaration-term) (context compilation-context))
     ;; The signature of relations contains only the argument types.
+    #+(or)
     (let* ((signature (signature term))
            (vars (mapcar (lambda (sort)
                            (make-anonymous-variable-term sort context))
@@ -319,6 +320,7 @@
               (cons (name term) vars))))
   
   (:method ((term relation-declaration-term) (context compilation-context))
+    #+(or)
     (let* ((signature (declared-sort term))
            (vars (if (consp signature)
                      (mapcar (lambda (sort)

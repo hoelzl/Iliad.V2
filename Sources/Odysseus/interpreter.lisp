@@ -329,7 +329,8 @@ raises an error otherwise.")
     (when (onlinep interpreter)
       (cerror "Backtrack anyway."
               'no-backtracking-in-online-mode-error))
-    (format t "~&Backtracking.~^%")
+    (when *trace-odysseus*
+      (format t "~&Backtracking.~^%"))
     (setf (interpreter-memento interpreter)
           (interpreter-memento choice-point))
     (interpret-1 interpreter (term choice-point) (situation choice-point))))
