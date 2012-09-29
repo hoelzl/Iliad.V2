@@ -260,9 +260,6 @@ raises an error otherwise.")
         (stored-continuations interpreter) '()
         (onlinep interpreter) t))
 
-(defvar *print-snark-timeouts* t)
-(defvar *print-snark-refutations* t)
-
 (defclass basic-interpreter-memento ()
   ((stored-actions
     :accessor stored-actions :initarg :stored-actions
@@ -288,6 +285,25 @@ raises an error otherwise.")
         (stored-continuations interpreter) (stored-continuations memento)
         (onlinep interpreter)              (onlinep memento)))
 
+
+(defvar *print-snark-timeouts* t)
+(defvar *print-snark-refutations* t)
+
+(defmethod prove ((interpreter basic-interpreter) (proof-term term))
+  (let* ((free-variables (free-variables proof-term))
+         (free-variable-sexprs (mapcar 'to-sexpr free-variables)))
+    (multiple-value-bind (result reason answer)
+        (prove-using-snark proof-term
+                           :answer `(answer ,@free-variable-sexprs)
+                           :context (context interpreter))
+      (when *trace-odysseus*
+        (cond ((and (eql reason :refutation-found) *print-snark-refutations*)
+               (format t "~&Refutation found for~25T~:W." (to-sexpr proof-term)))
+              ((and (eql reason :timeout) *print-snark-timeouts*)
+               (format t "~&Timeout while proving~25T~:W." (to-sexpr proof-term)))))
+      (values result reason free-variables answer))))
+
+
 (defmethod can-execute-p
     ((interpreter basic-interpreter) (term primitive-action-term) situation)
   (let ((action-def (primitive-action-definition (operator term) interpreter)))
@@ -295,20 +311,11 @@ raises an error otherwise.")
         ;; Terms without precondition can always execute.
         (values t :no-precondition '() '())
         ;; TERM has a precondition.  Pass it to Snark for evaluation.
-        (let* ((proof-term `(poss ,(to-sexpr term) ,(to-sexpr situation)))
-               (free-variables (union (free-variables term)
-                                      (free-variables situation)))
-               (free-variable-sexprs (mapcar 'to-sexpr free-variables)))
-          (multiple-value-bind (result reason answer)
-              (prove-using-snark proof-term
-                                 :answer `(answer ,@free-variable-sexprs)
-                                 :context (context interpreter))
-            (when *trace-odysseus*
-              (when  (and (eql reason :refutation-found) *print-snark-refutations*)
-                (format t "~&Refutation found for~25T~:W." proof-term))
-              (when  (and (eql reason :timeout) *print-snark-timeouts*)
-                (format t "~&Timeout while proving~25T~:W." proof-term)))
-            (values result reason free-variables answer))))))
+        (let ((proof-term (make-instance 'unknown-general-application-term
+                             :operator 'poss
+                             :arguments (list term situation)
+                             :context (context interpreter))))
+          (prove interpreter proof-term)))))
 
 (defmethod execute-stored-actions ((interpreter basic-interpreter))
   (let ((actions (nreverse (stored-actions interpreter)))
@@ -410,50 +417,61 @@ returned as first argument."))
                 (mapcar 'to-sexpr free-variables)
                 answer))))
 
+(defun perform-substitutions-in-interpreter
+    (interpreter term situation free-variables answer)
+  (let* ((local-context (make-instance 'local-context
+                          :enclosing-context (context interpreter)))
+         (new-terms
+           (mapcar (lambda (exp)
+                     (parse-into-term-representation exp local-context))
+                   (rest answer))))
+    (when new-terms
+      (setf term (substitute-terms new-terms free-variables term)
+            (stored-actions interpreter)
+            (mapcar (lambda (action)
+                      (substitute-terms new-terms free-variables action))
+                    (stored-actions interpreter))
+            (stored-continuations interpreter)
+            (mapcar (lambda (continuation)
+                      (substitute-terms new-terms free-variables continuation))
+                    (stored-continuations interpreter)))
+      (unless (onlinep interpreter)
+        (setf situation (substitute-terms new-terms free-variables situation))))
+    (values term situation)))
+
+(defmethod interpret-1
+    ((interpreter basic-interpreter) (term test-term) situation)
+  ())
+
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term primitive-action-term) situation)
   (multiple-value-bind (can-execute-p reason free-variables answer)
       (can-execute-p interpreter term situation)
     (cond (can-execute-p
-           (let* ((context (make-instance 'local-context
-                             :enclosing-context (context interpreter)))
-                  (new-terms
-                    (mapcar (lambda (exp)
-                              (parse-into-term-representation exp context))
-                            (rest answer))))
-             (when new-terms
-               (setf term (substitute-terms new-terms free-variables term)
-                     (stored-actions interpreter)
-                     (mapcar (lambda (action)
-                               (substitute-terms new-terms free-variables action))
-                             (stored-actions interpreter))
-                     (stored-continuations interpreter)
-                     (mapcar (lambda (action)
-                               (substitute-terms new-terms free-variables action))
-                             (stored-continuations interpreter)))
-               (unless (onlinep interpreter)
-                 (setf situation (substitute-terms new-terms free-variables situation))))
-             (cond ((onlinep interpreter)
-                    (maybe-output-execution-trace-information
-                     ">>> Executing" term reason free-variables answer)
-                    (values term
-                            (the-empty-program-term interpreter)
-                            (make-instance 'successor-situation
-                              :action term
-                              :previous-situation situation)))
-                   (t
-                    (maybe-output-execution-trace-information
-                     "Storing" term reason free-variables answer)
-                    (push term (stored-actions interpreter))
-                    (values (the-no-operation-term interpreter)
-                            (the-empty-program-term interpreter)
-                            (make-instance 'successor-situation
-                              :action term
-                              :previous-situation situation))))))
-           (t
-            (maybe-output-execution-trace-information
-             "NOT Executing" term reason free-variables answer)
-            (backtrack interpreter)))))
+           (multiple-value-setq (term situation)
+             (perform-substitutions-in-interpreter
+              interpreter term situation free-variables answer))
+           (cond ((onlinep interpreter)
+                  (maybe-output-execution-trace-information
+                   ">>> Executing" term reason free-variables answer)
+                  (values term
+                          (the-empty-program-term interpreter)
+                          (make-instance 'successor-situation
+                            :action term
+                            :previous-situation situation)))
+                 (t
+                  (maybe-output-execution-trace-information
+                   "Storing" term reason free-variables answer)
+                  (push term (stored-actions interpreter))
+                  (values (the-no-operation-term interpreter)
+                          (the-empty-program-term interpreter)
+                          (make-instance 'successor-situation
+                            :action term
+                            :previous-situation situation)))))
+          (t
+           (maybe-output-execution-trace-information
+            "NOT Executing" term reason free-variables answer)
+           (backtrack interpreter)))))
   
 (defun interpret-1-body-term (interpreter term situation)
   (let ((body (body term)))

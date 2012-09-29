@@ -74,20 +74,25 @@
 
 (defvar *print-snark-output* nil)
 
-(defun prove-using-snark (term &rest args &key context answer)
-  (declare (ignore context))
-  (unless answer
-    (alexandria:remove-from-plistf args :answer))
-  (flet ((do-prove ()
-	   (let ((result (apply 'ida-prove-or-refute term args)))
-	     (case result
-	       (:proof-found
-		(values t :proof-found (answer t)))
-	       (:refutation-found
-		(values nil :refutation-found (answer t)))
-	       (otherwise
-		(values nil :timeout nil))))))
-    (if *print-snark-output*
-	(do-prove)
-	(with-no-output 
-	  (do-prove)))))
+(defgeneric prove-using-snark (term &rest args &key context answer)
+  (:documentation
+   "Prove TERM using SNARK.")
+  (:method ((term odysseus-syntax:term) &rest args &key &allow-other-keys)
+    (apply 'prove-using-snark (odysseus-syntax:to-sexpr term) args))
+  (:method ((term cons) &rest args &key context answer)
+    (declare (ignore context))
+    (unless answer
+      (alexandria:remove-from-plistf args :answer))
+    (flet ((do-prove ()
+             (let ((result (apply 'ida-prove-or-refute term args)))
+               (case result
+                 (:proof-found
+                  (values t :proof-found (answer t)))
+                 (:refutation-found
+                  (values nil :refutation-found (answer t)))
+                 (otherwise
+                  (values nil :timeout nil))))))
+      (if *print-snark-output*
+          (do-prove)
+          (with-no-output 
+            (do-prove))))))
