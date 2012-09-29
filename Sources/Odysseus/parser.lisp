@@ -6,6 +6,8 @@
 ;;; in the root directory for further information.
 
 (in-package #:odysseus-parser)
+#+debug-odysseus
+(declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 (5am:in-suite odysseus-parser-suite)
 
 (defun starts-with-question-mark-p (symbol)
