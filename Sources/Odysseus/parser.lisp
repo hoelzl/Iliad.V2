@@ -257,7 +257,7 @@ Otherwise return an instance of UNKNOWN-GENERAL-APPLICATION-TERM."
   (let* ((operator (first exp))
 	 (known-type (term-type-for-operator operator context nil))
          (term (cond (known-type
-                      (make-instance known-type :context context :source exp))
+                      (apply 'make-instance known-type :context context :source exp '()))
                      ((let ((primitive-action-definition
                               (gethash operator (primitive-actions context) nil)))
                         (if primitive-action-definition
@@ -273,5 +273,5 @@ Otherwise return an instance of UNKNOWN-GENERAL-APPLICATION-TERM."
                      (t
                       (make-instance 'unknown-general-application-term
                                      :operator operator :context context :source exp)))))
-    (parse-arguments-for-term term (rest exp) (context term))
+    (parse-arguments-for-term term (rest exp) (or (context term) context))
     term))

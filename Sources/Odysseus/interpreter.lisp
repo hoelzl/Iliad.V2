@@ -92,10 +92,11 @@ suitable for storing it in a choice point."))
   (:documentation
    "Returns the next available choice point."))
 
-(defgeneric backtrack (interpreter)
+(defgeneric backtrack (interpreter &optional reason)
   (:documentation
    "Abandons the current computation and continues execution of the
-   interpreter at the previous choice point."))
+   interpreter at the previous choice point.  Reason is a reason for
+   diagnostic purposes."))
 
 (defgeneric stored-actions (interpreter)
   (:documentation
@@ -235,6 +236,9 @@ raises an error otherwise.")
    (stored-actions
     :accessor stored-actions :initarg :stored-actions
     :initform '())
+   (stored-continuations
+    :accessor stored-continuations :initarg :stored-continuations
+    :initform '())
    (onlinep 
     :accessor onlinep :initarg :onlinep :initform t
     :documentation "Returns T if the interpreter is in online mode."))
@@ -251,6 +255,7 @@ raises an error otherwise.")
   (setf (state-map interpreter) (make-hash-table)
         (choice-points interpreter) '()
         (stored-actions interpreter) '()
+        (stored-continuations interpreter) '()
         (onlinep interpreter) t))
 
 (defvar *print-snark-timeouts* t)
@@ -259,17 +264,27 @@ raises an error otherwise.")
 (defclass basic-interpreter-memento ()
   ((stored-actions
     :accessor stored-actions :initarg :stored-actions
-    :initform (required-argument :stored-actions)))
+    :initform (required-argument :stored-actions))
+   (stored-continuations
+    :accessor stored-continuations :initarg :stored-continuations
+    :initform (required-argument :stored-continuations))
+   (onlinep
+    :accessor onlinep :initarg :onlinep
+    :initform (required-argument :onlinep)))
   (:documentation
    "The memento for a basic interpreter."))
 
 (defmethod interpreter-memento ((interpreter basic-interpreter))
   (make-instance 'basic-interpreter-memento
-                 :stored-actions (stored-actions interpreter)))
+                 :stored-actions (stored-actions interpreter)
+                 :stored-continuations (stored-continuations interpreter)
+                 :onlinep (onlinep interpreter)))
 
 (defmethod (setf interpreter-memento)
-    ((new-memento basic-interpreter-memento) (interpreter basic-interpreter))
-  (setf (stored-actions interpreter) (stored-actions new-memento)))
+    ((memento basic-interpreter-memento) (interpreter basic-interpreter))
+  (setf (stored-actions interpreter)       (stored-actions memento)
+        (stored-continuations interpreter) (stored-continuations memento)
+        (onlinep interpreter)              (onlinep memento)))
 
 (defmethod can-execute-p
     ((interpreter basic-interpreter) (term primitive-action-term) situation)
@@ -324,13 +339,13 @@ raises an error otherwise.")
       ;; This should be controllable by an execution strategy.
       (pop (choice-points interpreter))))
 
-(defmethod backtrack ((interpreter interpreter))
+(defmethod backtrack ((interpreter interpreter) &optional reason)
   (let ((choice-point (next-choice-point interpreter)))
     (when (onlinep interpreter)
       (cerror "Backtrack anyway."
               'no-backtracking-in-online-mode))
     (when *trace-odysseus*
-      (format t "~&Backtracking.~^%"))
+      (format t "~&~:[Backtracking~;~:*~A~].~%" reason))
     (setf (interpreter-memento interpreter)
           (interpreter-memento choice-point))
     (interpret-1 interpreter (term choice-point) (situation choice-point))))
@@ -409,7 +424,11 @@ returned as first argument."))
                      (stored-actions interpreter)
                      (mapcar (lambda (action)
                                (substitute-terms new-terms free-variables action))
-                             (stored-actions interpreter)))
+                             (stored-actions interpreter))
+                     (stored-continuations interpreter)
+                     (mapcar (lambda (action)
+                               (substitute-terms new-terms free-variables action))
+                             (stored-continuations interpreter)))
                (unless (onlinep interpreter)
                  (setf situation (substitute-terms new-terms free-variables situation))))
              (cond ((onlinep interpreter)
@@ -441,18 +460,21 @@ returned as first argument."))
                         (the-empty-program-term interpreter)
                         situation))
 	  (t
+           (push (make-instance (class-of term)
+                   :context (context term)
+                   :source :generated-term
+                   :body (rest body))
+                 (stored-continuations interpreter))
 	   (multiple-value-bind (action rest-term new-situation)
 	       (interpret-1 interpreter (first body) situation)
-             (let ((new-term
-                     (make-instance (class-of term)
-                                    :context (context term)
-                                    :source :generated-term
-                                    :body (if (is-final-term-p rest-term)
-                                              (rest body)
-                                              (cons rest-term (rest body))))))
-               (values action
-                       new-term
-                       new-situation)))))))
+             (values action
+                     (if (is-final-term-p rest-term)
+                         (the-empty-program-term interpreter)
+                         (make-instance (class-of term)
+                           :context (context term)
+                           :source :generated-term
+                           :body rest-term))
+                     new-situation))))))
 
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term sequence-term) situation)
@@ -478,14 +500,12 @@ returned as first argument."))
       (let ((choice-points
               (mapcar (lambda (choice)
                         (make-choice-point interpreter choice situation))
-                      ;;; FIXME: This is wrong!  We need to store a possible
-                      ;;; continuation after executing the body.
                       (if *permute-offline-choice*
                           (shuffle (body term))
                           (reverse (body term))))))
         (setf (choice-points interpreter)
               (append choice-points (choice-points interpreter)))
-        (backtrack interpreter))))
+        (backtrack interpreter "Starting action choice"))))
 
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term declaration-term) situation)
@@ -540,15 +560,19 @@ returned as first argument."))
                (unless (typep action 'no-operation-term)
                  (assert (onlinep interpreter) ()
                          "Cannot execute actions while the interpreter is offline.")
+                 #+(or)
                  (assert (null (stored-actions interpreter)) ()
                          "Should not have stored actions when trying to execute an action.")
                  (execute-stored-actions interpreter))
                (execute-primitive-action interpreter action)
-               (cond ((is-final-term-p rest-term)
-                      (execute-stored-actions interpreter)
-                      (values (to-sexpr new-situation) t))
-                     (t
-                      (recurse rest-term new-situation))))))
+               (if (is-final-term-p rest-term)
+                   (cond ((stored-continuations interpreter)
+                          (recurse (pop (stored-continuations interpreter))
+                                   new-situation))
+                         (t
+                          (execute-stored-actions interpreter)
+                          (values (to-sexpr new-situation) t)))
+                   (recurse rest-term new-situation)))))
     (if *suppress-interpretation-errors*
         (handler-case
             (recurse term situation)
@@ -556,4 +580,3 @@ returned as first argument."))
             (values (or error-value (class-name (class-of condition)))
                     nil)))
         (recurse term situation))))
-      

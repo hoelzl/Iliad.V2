@@ -187,9 +187,9 @@ NEW-VALUE.")
           "Cannot create a primitive action definition without operator.")
   (setf (primitive-action-definition operator context) self)
   (when (and precondition (consp precondition))
-    (setf (slot-value self 'action-precondition)
-          (parse-into-term-representation
-           `(assert ',precondition) context))))
+    (let ((precondition-term (parse-into-term-representation
+                              `(assert ',precondition) context)))
+      (setf (slot-value self 'action-precondition) precondition-term))))
 
 (defgeneric declare-primitive-action (operator context &optional class-name)
   (:documentation
@@ -198,10 +198,10 @@ primitive-action definition for OPERATOR in CONTEXT.")
   (:method ((operator symbol) (context compilation-context)
             &optional (class-name (symbolicate operator '#:-term)))
     (cerror "Continue anyway."
-            "Declaring undefined primitive action."
-            (setf (primitive-action-definition operator context)
-                  (make-instance 'primitive-action-definition
-                    :operator operator :class class-name :context context)))))
+            "Declaring undefined primitive action.")
+    (setf (primitive-action-definition operator context)
+          (make-instance 'primitive-action-definition
+            :operator operator :class class-name :context context))))
 
 (defun define-primitive-action (operator signature
                                 &key (class-name  (symbolicate operator '#:-term))

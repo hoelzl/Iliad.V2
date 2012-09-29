@@ -363,28 +363,36 @@
     (celebrate lenz))))
 
 (defexample interpret-13 (:set-up-function 'set-up-ewsc-theory)
-  (search
-   (choose
-    (work ?p.person)
+  (seq
+   (sleep matthias)
+   (search
+    (choose
+     (work ?p.person)
+     (eat ?p.person)
+     (sleep ?p.person))
     (eat ?p.person)
-    (sleep ?p.person))
-   (eat ?p.person)
-   (celebrate ?p.person)))
+    (celebrate ?p.person))))
 
 (defexample interpret-13a (:set-up-function 'set-up-ewsc-theory)
-  (search
-   (work ?p.person)
-   (eat ?p.person)
-   (celebrate ?p.person)))
+  (seq
+   (sleep matthias)
+   (search
+    (work ?p.person)
+    (eat ?p.person)
+    (celebrate ?p.person))))
 
 (defexample interpret-13b (:set-up-function 'set-up-ewsc-theory)
-  (search
-   (eat ?p.person)
-   (eat ?p.person)
-   (celebrate ?p.person)))
+  (seq
+   (sleep matthias)
+   (search
+    (eat ?p.person)
+    (eat ?p.person)
+    (celebrate ?p.person))))
 
 (defexample interpret-13c (:set-up-function 'set-up-ewsc-theory)
-  (search
-   (sleep ?p.person)
-   (eat ?p.person)
-   (celebrate ?p.person)))
+  (seq
+   (sleep matthias)
+   (search
+    (sleep ?p.person)
+    (eat ?p.person)
+    (celebrate ?p.person))))
