@@ -230,6 +230,7 @@
       #:interpreter
       #:reset-interpreter
       #:interpreter-memento
+      #:prove
       #:can-execute-p
       #:choice-point
       #:term #:situation #:interpreter-memento
@@ -237,6 +238,8 @@
       #:stored-actions
       #:execute-stored-actions #:execute-primitive-action
       #:state-map #:can-set-state-p #:state
+      #:maybe-output-trace-information
+      #:perform-substitutions-in-interpreter
 
       ;; TODO: should belong to the configuration framework.
       #:*permute-offline-choice*

@@ -42,6 +42,7 @@
     ;; Fluent
     (declare-relational-fluent 'is-rested-p '(person situation))
 
+    ;; Actions
     (declare-primitive-action 'eat '(action person))
     (declare-primitive-action 'work '(action person))
     (declare-primitive-action 'sleep '(action person))
@@ -49,11 +50,11 @@
       :precondition '(iff (poss (celebrate ?p.person) ?s.situation)
                           (is-rested-p ?p.person ?s.situation)))
   
-    ;; Actions
     (declare-unique-function 'no-operation 0
                              :sort '(action)
                              :injective t)
   
+    #+(or)
     (declare-ordering-greaterp 'do 'work 'sleep 'annabelle 'lenz 'matthias)
 
     ;; Axioms
@@ -61,10 +62,23 @@
              :supported nil :sequential t)
     (assert-rewrite ',*is-rested-p-axiom*)
   
+    ;; Initial situation
     (assert '(is-rested-p annabelle s0)
             :name :annabelle-is-rested-in-s0)
     (assert '(not (is-rested-p lenz s0))
-            :name :lenz-is-not-rested-in-s0)))
+            :name :lenz-is-not-rested-in-s0)
+    
+    ;; Background knowledge
+    (declare-relation 'female 1 :sort '(person))
+    (declare-relation 'male 1 :sort '(person))
+    (assert '(iff (female ?p.person) (not (male ?p.person)))
+            :supported nil)
+    (assert '(or (male ?p.person) (female ?p.person))
+            :supported nil)
+    (assert '(female annabelle))
+    (assert '(male lenz))
+    (assert '(male matthias))
+    ))
 
 #+(or)
 (define-procedure control (x.person y.person s.situation)
@@ -398,3 +412,30 @@
     (sleep ?p.person)
     (eat ?p.person)
     (celebrate ?p.person))))
+
+(defexample interpret-14 (:set-up-function 'set-up-ewsc-theory)
+  (holds? '(male ?p.person))
+  (sleep ?p.person))
+
+(defexample interpret-14a (:set-up-function 'set-up-ewsc-theory)
+  (holds? '(male lenz))
+  (sleep ?p.person))
+
+(defexample interpret-14b (:set-up-function 'set-up-ewsc-theory)
+  (holds? '(male annabelle))
+  (sleep ?p.person))
+
+(defexample interpret-15 (:set-up-function 'set-up-ewsc-theory)
+  (search
+   (choose (holds (male ?p.person)) (holds (female ?p.person)))
+   (celebrate ?p.person)))
+
+(defexample interpret-16 (:set-up-function 'set-up-ewsc-theory)
+  ;; This fails because no closure is computed for the choice points after
+  ;; they have been successful.  Add "closure choice points" with a
+  ;; configurable level.
+  (search
+   (work annabelle)
+   (choose (holds (female ?p.person)) (holds (male ?p.person)))
+   (celebrate ?p.person)
+   (holds (male ?p.person))))

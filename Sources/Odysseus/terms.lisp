@@ -105,7 +105,7 @@
 
 (defclass variable-term (term name-mixin source-mixin)
   ((unique-name
-    :initform nil
+    :initform nil :initarg :unique-name
     :documentation "A unique name for code generation.")
    (declared-sort
     :accessor declared-sort :initarg :sort :initform t
