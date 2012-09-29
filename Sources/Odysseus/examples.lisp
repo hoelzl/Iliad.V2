@@ -35,9 +35,10 @@
     ;; Objects
     (declare-subsort 'person 'object)
 
-    (declare-unique-constant 'annabelle :sort 'person :constructor nil)
-    (declare-unique-constant 'lenz :sort 'person :constructor nil)
-    (declare-unique-constant 'matthias :sort 'person :constructor nil)
+    (declare-unique-constant 'annabelle :sort 'person)
+    (declare-unique-constant 'laith :sort 'person)
+    (declare-unique-constant 'lenz :sort 'person)
+    (declare-unique-constant 'matthias :sort 'person)
     
     ;; Fluent
     (declare-relational-fluent 'is-rested-p '(person situation))
@@ -54,9 +55,6 @@
                              :sort '(action)
                              :injective t)
   
-    #+(or)
-    (declare-ordering-greaterp 'do 'work 'sleep 'annabelle 'lenz 'matthias)
-
     ;; Axioms
     (assert  ',*is-rested-p-axiom*
              :supported nil :sequential t)
@@ -65,6 +63,8 @@
     ;; Initial situation
     (assert '(is-rested-p annabelle s0)
             :name :annabelle-is-rested-in-s0)
+    (assert '(is-rested-p laith s0)
+            :name :laith-is-rested-in-s0)
     (assert '(not (is-rested-p lenz s0))
             :name :lenz-is-not-rested-in-s0)
     
@@ -76,6 +76,7 @@
     (assert '(or (male ?p.person) (female ?p.person))
             :supported nil)
     (assert '(female annabelle))
+    (assert '(male laith))
     (assert '(male lenz))
     (assert '(male matthias))
     ))
@@ -138,28 +139,29 @@
 
 (defexample interpret-06 (:set-up-function 'set-up-ewsc-theory
                           :keys '(:error-value :nobody-can-work-and-celebrate))
-  (seq
-   (work ?p.person)
-   (celebrate ?p.person)))
-
-(defexample interpret-06a (:set-up-function 'set-up-ewsc-theory
-                          :keys '(:error-value :nobody-can-work-and-celebrate))
   (search
    (work ?p.person)
    (celebrate ?p.person)))
 
+(defexample interpret-06a (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t
+                          :keys '(:error-value :nobody-can-work-and-celebrate))
+  (seq
+   (work ?p.person)
+   (celebrate ?p.person)))
+
 (defexample interpret-06b (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t
                           :keys '(:error-value :nobody-can-work-and-celebrate))
   (search
    (seq
     (work ?p.person)
     (celebrate ?p.person))))
 
-(defexample interpret-07 (:set-up-function 'set-up-ewsc-theory
-                          :keys '(:error-value :nobody-can-work-and-celebrate))
-  (seq
+(defexample interpret-07 (:set-up-function 'set-up-ewsc-theory)
+  (search
    (work ?p.person)
-   (no-operation)
+   (eat ?p.person)
    (celebrate ?p.person)))
 
 (defexample interpret-08 (:set-up-function 'set-up-ewsc-theory)
@@ -176,36 +178,39 @@
    (celebrate ?p.person)))
 
 (defexample interpret-09a (:set-up-function 'set-up-ewsc-theory)
-  (seq
+  (search
    (eat ?p.person)
-   (eat ?p.person)
+   (work ?p.person)
    (eat ?p.person)
    (celebrate ?p.person)))
 
 (defexample interpret-09b (:set-up-function 'set-up-ewsc-theory)
   (search
    (eat ?p.person)
-   (work ?p.person)
+   (sleep ?p.person)
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09c (:set-up-function 'set-up-ewsc-theory)
+(defexample interpret-09c (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
+  (seq
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-09d (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (search
+   (eat ?p.person)
+   (work ?p.person)
    (eat ?p.person)
    (sleep ?p.person)
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09d (:set-up-function 'set-up-ewsc-theory)
-  (search
-   (eat ?p.person)
-   (work ?p.person)
-   (eat ?p.person)
-   (sleep ?p.person)
-   (eat ?p.person)
-   (celebrate ?p.person)))
-
-(defexample interpret-09e (:set-up-function 'set-up-ewsc-theory)
+(defexample interpret-09e (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (search
    (choose
     (work ?p.person)
@@ -214,7 +219,8 @@
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09f (:set-up-function 'set-up-ewsc-theory :hidden? t)
+(defexample interpret-09f (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (search
    (eat ?p.person)
    (work ?p.person)
@@ -278,7 +284,8 @@
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09g (:set-up-function 'set-up-ewsc-theory :hidden? t)
+(defexample interpret-09g (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (search
    (eat ?p.person)
    (eat ?p.person)
@@ -294,7 +301,8 @@
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09h (:set-up-function 'set-up-ewsc-theory :hidden? t)
+(defexample interpret-09h (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (search
    (sleep ?p.person)
    (eat ?p.person)
@@ -313,7 +321,8 @@
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09i (:set-up-function 'set-up-ewsc-theory :hidden? t)
+(defexample interpret-09i (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (search
    (work ?p.person)
    (eat ?p.person)
@@ -331,7 +340,8 @@
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09j (:set-up-function 'set-up-ewsc-theory :hidden? t)
+(defexample interpret-09j (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (search
    (choose
     (work ?p.person)
@@ -363,7 +373,8 @@
      (sleep ?p.person)
      (celebrate ?p.person)))))
 
-(defexample interpret-12a (:set-up-function 'set-up-ewsc-theory)
+(defexample interpret-12a (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (search
    (choose
     (celebrate ?p.person)
@@ -371,7 +382,8 @@
      (sleep ?p.person)
      (celebrate lenz)))))
 
-(defexample interpret-12b (:set-up-function 'set-up-ewsc-theory)
+(defexample interpret-12b (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (choose
    (celebrate ?p.person)
    (seq
@@ -389,7 +401,8 @@
     (eat ?p.person)
     (celebrate ?p.person))))
 
-(defexample interpret-13a (:set-up-function 'set-up-ewsc-theory)
+(defexample interpret-13a (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (seq
    (sleep matthias)
    (search
@@ -397,7 +410,8 @@
     (eat ?p.person)
     (celebrate ?p.person))))
 
-(defexample interpret-13b (:set-up-function 'set-up-ewsc-theory)
+(defexample interpret-13b (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (seq
    (sleep matthias)
    (search
@@ -405,7 +419,8 @@
     (eat ?p.person)
     (celebrate ?p.person))))
 
-(defexample interpret-13c (:set-up-function 'set-up-ewsc-theory)
+(defexample interpret-13c (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (seq
    (sleep matthias)
    (search
@@ -417,11 +432,13 @@
   (holds? '(male ?p.person))
   (sleep ?p.person))
 
-(defexample interpret-14a (:set-up-function 'set-up-ewsc-theory)
+(defexample interpret-14a (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (holds? '(male lenz))
   (sleep ?p.person))
 
-(defexample interpret-14b (:set-up-function 'set-up-ewsc-theory)
+(defexample interpret-14b (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
   (holds? '(male annabelle))
   (sleep ?p.person))
 
@@ -431,11 +448,53 @@
    (celebrate ?p.person)))
 
 (defexample interpret-16 (:set-up-function 'set-up-ewsc-theory)
-  ;; This fails because no closure is computed for the choice points after
-  ;; they have been successful.  Add "closure choice points" with a
-  ;; configurable level.
   (search
    (work annabelle)
-   (choose (holds (female ?p.person)) (holds (male ?p.person)))
+   (choose (holds (female ?p.person))
+           (holds (male ?p.person)))
    (celebrate ?p.person)
    (holds (male ?p.person))))
+
+(defexample interpret-16a (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
+  (search
+   (choose (holds (female ?p.person))
+           (holds (male ?p.person)))
+   (celebrate ?p.person)
+   (holds (male ?p.person))))
+
+(defexample interpret-16b (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
+  (holds (is-rested-p laith s0)))
+
+(defexample interpret-16c (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
+  (holds (is-rested-p laith (do (work annabelle) s0))))
+
+(defexample interpret-16d (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
+  (holds
+   (or (= (work annabelle) (sleep laith))
+       (and (is-rested-p laith s0)
+            (not (= (work annabelle) (work laith)))))))
+
+(defexample interpret-16d.1 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (holds
+   (= (work annabelle) (sleep laith))))
+
+(defexample interpret-16d.2 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (holds
+   (not (= (work annabelle) (work laith)))))
+
+(defexample interpret-16e (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
+  (holds (poss (celebrate laith) (do (work annabelle) s0))))
+
+(defexample interpret-16f (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
+  (holds (= (celebrate laith) (work ?p.person))))
+
+
+

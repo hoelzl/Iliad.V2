@@ -5,7 +5,7 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-utilities)
+(in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 #+5am
@@ -38,4 +38,12 @@
                            (call-next-method))))
 	       (call-next-method))))))
 
-(in-package #:odysseus)
+;;; Maybe suppressing Snark output
+;;; ==============================
+
+(defmacro maybe-suppress-snark-output (&body body)
+  `(if *print-snark-output*
+       (progn ,@body)
+       (snark:with-no-output
+         ,@body)))
+

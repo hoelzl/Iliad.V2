@@ -5,7 +5,7 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-parser)
+(in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 (5am:in-suite odysseus-parser-suite)
@@ -85,6 +85,20 @@ question mark."
         (mapcar (lambda (subexp)
                   (parse-into-term-representation (unquote subexp) context))
                 arguments)))
+
+(defmethod parse-arguments-for-term ((term test-term) arguments context)
+  (declare (ignore context))  
+  (setf (argument term)
+        (parse-into-term-representation (unquote (first arguments))
+                                        (context term)))
+  (let ((keywords (mapcar 'unquote (rest arguments))))
+    (setf (keywords term) keywords)
+    (let ((solution-depth (getf keywords :solution-depth)))
+      (when solution-depth
+        (setf (solution-depth term) solution-depth)))
+    (let ((max-solution-depth (getf keywords :max-solution-depth)))
+      (when max-solution-depth
+        (setf (max-solution-depth term) max-solution-depth)))))
 
 (defmethod parse-arguments-for-term ((term body-term) arguments context)
   "Parse each for a body term argument into term representation in CONTEXT."

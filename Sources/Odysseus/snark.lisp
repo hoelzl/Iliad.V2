@@ -9,8 +9,11 @@
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 
-(defun initialize-snark ()
-  (initialize)
+(defvar *print-snark-output* nil)
+
+(defun initialize-snark (&key (run-time-limit 0.1))
+  (maybe-suppress-snark-output
+    (initialize))
   ;; (agenda-length-limit nil)
   (use-hyperresolution t)
   (use-negative-hyperresolution t)
@@ -30,7 +33,7 @@
   (print-rows-when-derived nil)
   (print-rows-when-finished nil)
   (print-agenda-when-finished nil)
-  (run-time-limit 0.1)
+  (run-time-limit run-time-limit)
   (use-conditional-answer-creation t)
   ;; (use-subsumption-by-false nil)
   (use-constructive-answer-restriction nil)
@@ -38,67 +41,126 @@
 
 
 (defun prove-or-refute (term &rest args
-			&key context
+			&key context (run-time-limit 0.1)
 			&allow-other-keys)
   (assert context (context)
           "Cannot prove or refute without a context.")
-  (initialize-snark)
+  (initialize-snark :run-time-limit run-time-limit)
   (set-up-snark context)
-  (let* ((new-args (alexandria:remove-from-plist args :set-up-theory :context))
-	 (result (apply 'prove term new-args)))
+  (let* ((new-args (alexandria:remove-from-plist
+                    args
+                    :solution-depth :context :run-time-limit))
+	 (result (maybe-suppress-snark-output
+                   (apply 'snark:prove term new-args))))
     (ecase result
       (:proof-found result)
       ((:run-time-limit :agenda-empty)
-       (initialize-snark)
+       (initialize-snark :run-time-limit run-time-limit)
        (set-up-snark context)
-       (let ((result (apply 'prove `(snark::not ,term) new-args)))
+       (let ((result (maybe-suppress-snark-output
+                       (apply 'prove `(snark::not ,term) new-args))))
 	 (ecase result
 	   (:proof-found :refutation-found)
 	   (:agenda-empty :agenda-empty)
-	   (:run-time-limit result)))))))
+	   (:run-time-limit :run-time-limit)))))))
 
-(defun ida-prove-or-refute (term &rest args &key context &allow-other-keys)
+(defvar *print-time-increases* nil)
+
+(defun ida-prove-or-refute (term &rest args &key &allow-other-keys)
   (let* ((initial-run-time-limit 0.1)
 	 (run-time-limit initial-run-time-limit)
-	 (iterations 20))
+	 (iterations 5))
+    (alexandria:remove-from-plistf args :run-time-limit)
     (dotimes (i iterations)
-      (initialize-snark)
-      (run-time-limit run-time-limit)
-      (set-up-snark context)
-      (let ((result (apply 'prove-or-refute term args)))
+      (let ((result (apply 'prove-or-refute term
+                           :run-time-limit run-time-limit
+                           args)))
 	(if (eql result :run-time-limit)
-	    (setf run-time-limit (* 2 run-time-limit))
+	    (progn
+              (when (and (trace-odysseus-p) *print-time-increases*)
+                (format t "~&Run time limit reached.  Extending time for proof search.~%"))
+              (setf run-time-limit (* 2 run-time-limit)))
 	    (return-from ida-prove-or-refute result))))
     (run-time-limit initial-run-time-limit)
     :run-time-limit))
 
-(defvar *print-snark-output* nil)
+(defvar *error-when-refutation-without-answer* t)
 
-(defgeneric prove-using-snark (term &rest args &key context answer)
+(define-condition refutation-without-answer (runtime-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream
+                     "Obtained a refutation without answer.~
+                      (This indicates that the action theory is contradictory.)"))))
+
+(defun snark-answer ()
+  (let ((result (answer t)))
+    (cond ((eql result 'snark-lisp:false)
+           (when *error-when-refutation-without-answer*
+             (cerror "Return an empty answer."
+                     'refutation-without-answer))
+           '())
+          (t result))))
+
+(defun compute-closure (depth)
+  (iterate (repeat depth)
+    (let ((result (maybe-suppress-snark-output
+                    (snark:closure))))
+      (case result
+        (:proof-found)
+        (:refutation-found
+         (leave (values nil :refutation-found (snark-answer))))
+        (:agenda-empty
+         (leave (values nil :undecidable (snark-answer))))
+        (otherwise
+         (leave (values nil :timeout nil)))))
+    (finally (return (values t :proof-found (snark-answer))))))
+
+(defun prove-using-snark-depth-zero (term args)
+  (when (trace-odysseus-p)
+    (format t "~&Trying to prove or refute:~28T~:W~%" term))
+  (let ((result (apply 'ida-prove-or-refute term args)))
+    (case result
+      (:proof-found
+       (values t :proof-found (snark-answer)))
+      (:refutation-found
+       (values nil :refutation-found (snark-answer)))
+      (:agenda-empty
+       (values nil :undecidable (snark-answer)))
+      (otherwise
+       (values nil :timeout nil)))))
+
+(defun prove-using-snark-closure (term solution-depth answer)
+  (when (trace-odysseus-p)
+    (format t "~&Trying to prove:~28T~:W" term))
+  (let ((result (maybe-suppress-snark-output
+                  (snark:prove term :answer answer))))
+    (ecase result
+      (:proof-found
+       (compute-closure solution-depth))
+      (:agenda-empty
+       (values nil :undecidable (snark-answer)))
+      (:run-time-limit
+       (values nil :timeout nil)))))
+
+(defgeneric prove-using-snark
+    (term &rest args &key context answer solution-depth)
   (:documentation
    "Prove TERM using SNARK.")
-  (:method ((term odysseus-syntax:term) &rest args &key context answer)
-    (declare (ignore context answer))
+
+  (:method ((term odysseus-syntax:term)
+            &rest args
+            &key context answer (solution-depth 0))
+    (declare (ignore context answer solution-depth))
     (apply 'prove-using-snark (odysseus-syntax:to-sexpr term) args))
-  (:method ((term cons) &rest args &key context answer)
+
+  (:method ((term cons)
+            &rest args
+            &key context answer (solution-depth 0))
     (declare (ignore context))
     (unless answer
       (alexandria:remove-from-plistf args :answer))
-    (labels ((snark-answer ()
-               (let ((result (answer t)))
-                 (if (eql result snark-lisp:false)
-                     (rest answer)
-                     result)))
-             (do-prove ()
-               (let ((result (apply 'ida-prove-or-refute term args)))
-                 (case result
-                   (:proof-found
-                    (values t :proof-found (snark-answer)))
-                   (:refutation-found
-                    (values nil :refutation-found (snark-answer)))
-                   (otherwise
-                    (values nil :timeout nil))))))
-      (if *print-snark-output*
-          (do-prove)
-          (with-no-output 
-            (do-prove))))))
+    (if (= solution-depth 0)
+        (prove-using-snark-depth-zero term args)
+        (prove-using-snark-closure term solution-depth answer))))

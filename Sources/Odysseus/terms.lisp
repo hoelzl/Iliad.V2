@@ -5,7 +5,7 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-syntax)
+(in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 (5am:in-suite odysseus-syntax-suite)
@@ -41,6 +41,30 @@
     (remove-from-plistf args :context)
     (apply #'call-next-method self :context new-context args)))
 
+;;; Keywords Mixin
+;;; ==============
+
+;;; A mixin for terms that support keyword arguments.
+
+(defclass keywords-mixin ()
+  ((keywords :accessor keywords :initarg :keywords
+             :initform '()))
+  (:documentation
+   "Mixin that provides a KEYWORDS slot."))
+
+
+(defgeneric declared-sort (term)
+  (:documentation
+   "Returns the sort of TERM, or NIL if no sort for TERM is known.")
+  (:method ((term keywords-mixin))
+    (getf (keywords term) :sort)))
+
+(defgeneric successor-state (term)
+  (:documentation
+   "Returns the successor state axiom of TERM, or NIL if none exists.")
+  (:method ((term keywords-mixin))
+    (getf (keywords term) :successor-state)))
+
 ;;; Unique Terms
 ;;; ============
 
@@ -70,10 +94,6 @@
   "All terms accept the :source and :intern keywords."
   ;; Simply ignore the intern keyword.
   (declare (ignore slot-names intern source)))
-
-(defgeneric declared-sort (term)
-  (:documentation
-   "Returns the sort of TERM, or NIL if no sort for TERM is known."))
 
 (defgeneric source (term)
   (:documentation
@@ -278,7 +298,7 @@ structure."))
   (:documentation "A known term that is also an application term."))
 
 (defclass unary-term (known-application-term)
-  ((argument :accessor argument :initarg :argument))
+  ((argument :accessor argument :initarg :argument :initform nil))
   (:documentation
    "An application term that can only take a single argument."))
 
@@ -289,13 +309,14 @@ structure."))
   "Provide :ARGUMENTS as additional init-keyword.  Its argument must be a list
 of length 1, and it must not be provided when the :ARGUMENT init-keyword is
 also provided."
-  (when arguments
-    (assert (and (consp arguments) (= (length arguments) 1))
-            (arguments)
-            "Key-word argument :ARGUMENTS is not a list of length 1: ~A." arguments)
-    (assert (not argument-supplied-p) ()
-            "Cannot provide both :ARGUMENT and :ARGUMENTS keyword arguments.")
-    (setf (argument self) (first arguments))))
+  (cond
+    (arguments
+     (assert (and (consp arguments) (= (length arguments) 1))
+             (arguments)
+             "Key-word argument :ARGUMENTS is not a list of length 1: ~A." arguments)
+     (assert (not argument-supplied-p) ()
+             "Cannot provide both :ARGUMENT and :ARGUMENTS keyword arguments.")
+     (setf (argument self) (first arguments)))))
 
 (defmethod arguments ((term unary-term))
   (list (argument term)))
@@ -528,13 +549,37 @@ or :ARG3 init-keywords is also provided."
 
 (define-primitive-action 'no-operation '())
 
-(defclass test-term (unary-term)
-  ()
+(defvar *default-max-solution-depth* 10)
+
+(defclass test-term (unary-term keywords-mixin)
+  ((solution-depth
+    :accessor solution-depth :initarg :solution-depth
+    :initform 0
+    :documentation
+    "How many solutions of the theorem prover should be skipped before we
+    accept the result.  This serves to drive search for alternative
+    solutions.")
+   (max-solution-depth
+    :accessor max-solution-depth :initarg :max-solution-depth
+    :initform *default-max-solution-depth*
+    :documentation
+    "The maximum solution depth for this term."))
   (:documentation
    "A term describing a test performed during the execution of a program."))
 
 (defmethod operator ((term test-term))
   'holds?)
+
+(defun clone-test-term-increasing-depth (term)
+  (check-type term test-term)
+  (make-instance 'test-term
+    :solution-depth (1+ (solution-depth term))
+    :argument (argument term)
+    :max-solution-depth (max-solution-depth term)
+    :keywords (remove-from-plist (keywords term) :solution-depth)
+    :context (context term)
+    :source :generated-term))
+
 
 (defclass sequence-term (body-term)
   ()
@@ -682,21 +727,6 @@ or :ARG3 init-keywords is also provided."
    this means that they are syntactically the same.  For named declarations
    this means that they declare the same kind of entity with the same name,
    not that the declarations are the same."))
-
-(defclass keywords-mixin ()
-  ((keywords :accessor keywords :initarg :keywords
-             :initform '()))
-  (:documentation
-   "Mixin that provides a KEYWORDS slot."))
-
-(defmethod declared-sort ((term keywords-mixin))
-  (getf (keywords term) :sort))
-
-(defgeneric successor-state (term)
-  (:documentation
-   "Returns the successor state axiom of TERM, or NIL if none exists.")
-  (:method ((term keywords-mixin))
-    (getf (keywords term) :successor-state)))
 
 ;;; TODO: Not sure whether this class is really needed unless we support
 ;;; incremental redefinition of declarations.  (But even then it's not so

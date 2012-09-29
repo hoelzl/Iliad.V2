@@ -5,16 +5,26 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-syntax)
+(in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
+
+(defvar *report-to-sexpr-errors* nil)
+
+(defun to-sexpr-maybe-error (term)
+  (if *report-to-sexpr-errors*
+      (error "~W cannot be converted into an s-expression." term)
+      term))
 
 (defgeneric to-sexpr (term)
   (:documentation
    "Convert TERM into an S-expression.")
 
+  (:method (term)
+    (to-sexpr-maybe-error term))
+
   (:method ((term term))
-    :unreadable-term)
+    (to-sexpr-maybe-error :unreadable-term))
 
   (:method ((term variable-term))
     (unique-name term))
@@ -43,6 +53,15 @@
 
   (:method ((term empty-program-term))
     'null)
+
+  (:method ((term test-term))
+    `(,(operator term)
+      ,(to-sexpr (argument term))
+      ,@(when (not (zerop (solution-depth term)))
+          `(:solution-depth ,(to-sexpr (solution-depth term))))
+      ,@(when (not (= *default-max-solution-depth* (max-solution-depth term)))
+          `(:max-solution-depth ,(to-sexpr (max-solution-depth term))))
+      ,@(remove-from-plist (keywords term) :solution-depth :max-solution-depth)))
 
   (:method ((term named-declaration-term))
     (list* (operator term)
@@ -199,11 +218,13 @@
 
   (:method ((new-terms list) (old-terms list) term-or-situation)
     (cond ((null new-terms)
+           #+(or)
            (assert (null old-terms) ()
                    "More old terms than new terms: ~:W."
                    old-terms)
            term-or-situation)
           (t
+           #+(or)
            (assert (not (null old-terms)) ()
                    "More new terms than old terms: ~:W.")
            (let ((new-term
@@ -262,6 +283,29 @@
              ,(wrap-in-forall vars `(not (= ,lhs-term ,rhs-term))))
            context))))))
 
+(defgeneric make-unique-names-axiom-for-arguments (term context)
+  (:documentation
+   "Returns the unique names axiom for the arguments of TERM in CONTEXT, i.e.,
+   an assertion that the operator of TERM is injective.")
+  ;; TODO: Would it be enough to simply declare the terms as injective?
+  (:method ((term term) (context compilation-context))
+    (multiple-value-bind (lhs-vars lhs-term)
+        (variables-and-term-for-universal-quantification term context)
+      (multiple-value-bind (rhs-vars rhs-term)
+          (variables-and-term-for-universal-quantification term context)
+        (let* ((vars (concatenate 'list lhs-vars rhs-vars))
+               (terms-unequal-assertion
+                 `(or ,@(mapcar (lambda (var1 var2)
+                                  `(not (= ,var1 ,var2)))
+                                lhs-vars rhs-vars))))
+          (parse-into-term-representation
+           `(assert
+             ,(wrap-in-forall 
+               vars
+               `(iff ,terms-unequal-assertion
+                     (not (= ,lhs-term ,rhs-term)))))
+           context))))))
+
 (defgeneric make-unique-names-axioms (compilation-context)
   (:method ((context compilation-context))
     (let* ((terms (unique-terms context))
@@ -269,11 +313,16 @@
       (iterate outer
         (for i from 0 below (1- length))
         (iterate
-          (for j from (1+ i) below length)
+          (for j from i below length)
           (in outer 
-              (collect
-                  (make-unique-names-axiom
-                   (aref terms i) (aref terms j) context))))))))
+              (if (= i j)
+                  (collect
+                      (make-unique-names-axiom-for-arguments (aref terms j)
+                                                             context))
+                  (collect
+                      (make-unique-names-axiom (aref terms i)
+                                               (aref terms j)
+                                               context)))))))))
 
 ;;; Interaction with Snark.
 ;;; ======================
@@ -286,62 +335,78 @@
                (format stream "~W is not a valid declaration for Snark."
                        declaration)))))
 
-(defgeneric process-declaration-for-snark (declaration)
+(defgeneric process-declaration-for-snark (declaration &key rewrite-too)
   (:documentation
    "Process DECLARATION so that the declared entity exists in Snark's
    theory.")
   
-  (:method (declaration)
+  (:method (declaration &key rewrite-too)
+    (declare (ignore rewrite-too))
     (cerror "Continue without processing the declaration."
             'invalid-declaration-type :declaration declaration))
-  (:method ((declaration sort-declaration-term))
+
+  (:method ((declaration sort-declaration-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (apply #'snark:declare-sort (declared-sort declaration) (keywords declaration))
     :declare-sort)
   
-  (:method ((declaration subsort-declaration-term))
+  (:method ((declaration subsort-declaration-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (apply #'snark:declare-subsort
            (declared-sort declaration) (supersort declaration) (keywords declaration))
     :declare-subsort)
   
-  (:method ((declaration sorts-incompatible-declaration-term))
+  (:method ((declaration sorts-incompatible-declaration-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (apply #'snark:declare-sorts-incompatible (sorts declaration))
     :declare-sorts-incompatible)
   
-  (:method ((declaration constant-declaration-term))
+  (:method ((declaration constant-declaration-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (apply #'snark:declare-constant (name declaration) (keywords declaration))
     :declare-constant)
   
-  (:method ((declaration function-declaration-term))
+  (:method ((declaration function-declaration-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (apply #'snark:declare-function (name declaration) (arity declaration) (keywords declaration))
     :declare-function)
   
-  (:method ((declaration relation-declaration-term))
+  (:method ((declaration relation-declaration-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (apply #'snark:declare-relation (name declaration) (arity declaration) (keywords declaration))
     :declare-relation)
   
-  (:method ((declaration ordering-declaration-term))
+  (:method ((declaration ordering-declaration-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (apply #'snark:declare-ordering-greaterp (ordered-symbols declaration))
     :declare-ordering-greaterp)
   
-  (:method ((declaration logical-assertion-term))
+  (:method ((declaration logical-assertion-term) &key rewrite-too)
     (apply #'snark::assert
            (to-sexpr (sentence declaration))
            (keywords declaration))
+    (when rewrite-too
+      (apply #'snark::assert-rewrite
+             (to-sexpr (sentence declaration))
+             (keywords declaration)))
     :assert)
   
-  (:method ((declaration logical-assumption-term))
+  (:method ((declaration logical-assumption-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (apply #'snark:assume
            (to-sexpr (sentence declaration))
            (keywords declaration))
     :assume)
   
-  (:method ((declaration rewrite-assertion-term))
+  (:method ((declaration rewrite-assertion-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (apply #'snark:assert-rewrite
            (to-sexpr (sentence declaration))
            (keywords declaration))
     :assert-rewrite)
   
-  (:method ((declaration primitive-action-declaration-term))
+  (:method ((declaration primitive-action-declaration-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (let ((signature (signature declaration))
           (keywords (remove-from-plist (keywords declaration) :precondition)))
       (apply #'snark:declare-function
@@ -351,7 +416,8 @@
              keywords))
     :primitive-action/declare-function)
   
-  (:method ((declaration relational-fluent-declaration-term))
+  (:method ((declaration relational-fluent-declaration-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (let ((signature (signature declaration)))
       (apply #'snark:declare-relation
              (name declaration)
@@ -360,7 +426,8 @@
              (keywords declaration)))
     :fluent/declare-relation)
   
-  (:method ((declaration functional-fluent-declaration-term))
+  (:method ((declaration functional-fluent-declaration-term) &key rewrite-too)
+    (declare (ignore rewrite-too))
     (let ((signature (signature declaration)))
       (apply #'snark:declare-function
              (name declaration)
@@ -368,6 +435,8 @@
              :sort signature
              (keywords declaration)))
     :fluent/declare-function))
+
+(defvar *trace-precondition-processing* nil)
 
 (defgeneric set-up-snark (compilation-context)
   (:documentation
@@ -378,8 +447,10 @@
     (iterate (for (nil action) in-hashtable (primitive-actions context))
       (let ((precondition (action-precondition action)))
         (when precondition
-          (format t "~&Processing ~A.~%" precondition)
-          (process-declaration-for-snark precondition))))
+          (when (and (trace-odysseus-p) *trace-precondition-processing*)
+            (format t "~&Processing precondition~28T~:W."
+                    precondition))
+          (process-declaration-for-snark precondition :rewrite-too t))))
     (iterate (for declaration in-sequence (make-unique-names-axioms context))
       (process-declaration-for-snark declaration))
     :snark-setup-completed))

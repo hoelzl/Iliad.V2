@@ -5,7 +5,7 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-interpreter)
+(in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 
@@ -81,7 +81,7 @@ suitable for storing it in a choice point."))
   (:documentation
    "Restores INTERPRETER to the state in which NEW-MEMENTO was captured."))
 
-(defgeneric prove (interpreter term)
+(defgeneric prove (interpreter term &key solution-depth)
   (:documentation
    "Try to prove or refute TERM in INTERPRETER."))
 
@@ -93,6 +93,11 @@ suitable for storing it in a choice point."))
 (defgeneric make-choice-point (interpreter term situation)
   (:documentation
    "Creates a new choice point for TERM in SITUATION."))
+
+(defgeneric add-choice-point (interpreter term situation)
+  (:documentation
+   "Creates a new choice point by calling MAKE-CHOICE-POINT and adds it to the
+   choice points of INTERPRETER."))
 
 (defgeneric next-choice-point (interpreter)
   (:documentation
@@ -195,17 +200,6 @@ raises an error otherwise.")
   (declare-functional-fluent operator (context interpreter) class-name))
 
 
-;;; Tracing
-;;; -------
-
-(defvar *trace-odysseus* t)
-
-(defun trace-odysseus ()
-  (setf *trace-odysseus* t))
-
-(defun untrace-odysseus ()
-  (setf *trace-odysseus* nil))
-
 
 ;;; The Class BASIC-INTERPRETER
 ;;; ---------------------------
@@ -230,6 +224,13 @@ raises an error otherwise.")
     :initform (required-argument :interpreter-memento)
     :documentation
     "The state of the interpreter at the time the choice point was captured.")))
+
+#+(or)
+(defclass repeated-choice-point (choice-point)
+  ((max-repetitions :accessor max-repetitions :initarg :max-repetitions
+                    :initform (required-argument :max-repetitions))
+   (current-repetition :accessor current-repetition :initarg :current-repetition
+                       :initform 0)))
 
 (defclass basic-interpreter (interpreter)
   ((state-map
@@ -291,20 +292,25 @@ raises an error otherwise.")
 
 
 (defvar *print-snark-timeouts* t)
+(defvar *print-snark-undecidables* t)
 (defvar *print-snark-refutations* t)
 
-(defmethod prove ((interpreter basic-interpreter) (proof-term term))
+(defmethod prove ((interpreter basic-interpreter) (proof-term term)
+                  &key (solution-depth 0))
   (let* ((free-variables (free-variables proof-term))
          (free-variable-sexprs (mapcar 'to-sexpr free-variables)))
     (multiple-value-bind (result reason answer)
         (prove-using-snark proof-term
                            :answer `(answer ,@free-variable-sexprs)
-                           :context (context interpreter))
+                           :context (context interpreter)
+                           :solution-depth solution-depth)
       (when *trace-odysseus*
         (cond ((and (eql reason :refutation-found) *print-snark-refutations*)
-               (format t "~&Refutation found for~25T~:W." (to-sexpr proof-term)))
+               (format t "~&Refutation found for:~28T~:W~%" (to-sexpr proof-term)))
+              ((and (eql reason :undecidable) *print-snark-undecidables*)
+               (format t "~&Cannot decide:~28T~:W~%" (to-sexpr proof-term)))
               ((and (eql reason :timeout) *print-snark-timeouts*)
-               (format t "~&Timeout while proving~25T~:W." (to-sexpr proof-term)))))
+               (format t "~&Timeout while proving:~28T~:W~%" (to-sexpr proof-term)))))
       (values result reason free-variables answer))))
 
 
@@ -345,6 +351,12 @@ raises an error otherwise.")
              :interpreter-memento (interpreter-memento interpreter))))
     ;; (push cp (choice-points interpreter))
     cp))
+
+(defmethod add-choice-point
+    ((interpreter basic-interpreter) term situation)
+  (let ((cp (make-choice-point interpreter term situation)))
+    (setf (choice-points interpreter)
+          (append (choice-points interpreter) (list cp)))))
 
 (defmethod next-choice-point ((interpreter basic-interpreter))
   (if (null (choice-points interpreter))
@@ -411,10 +423,10 @@ returned as first argument."))
   (when *trace-odysseus*
     (if (or (eql reason :no-precondition)
             (null free-variables))
-        (format t "~&~A~25T~:W:~%  Reason:~25T~A~%"
+        (format t "~&~A~28T~:W~%    Reason:~28T~A~%"
                 action (to-sexpr term) reason)
-        (format t "~&~A~25T~:W:~%  Reason:~25T~A~%  ~
-                   Free Variables:~25T~:W~%  Answer:~25T~:W~%"
+        (format t "~&~A~28T~:W~%    Reason:~28T~A~%    ~
+                   Free Variables:~28T~:W~%    Answer:~28T~:W~%"
                 action
                 (to-sexpr term)
                 reason
@@ -445,20 +457,25 @@ returned as first argument."))
 
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term test-term) situation)
+  (when (< (solution-depth term) (max-solution-depth term))
+    (add-choice-point interpreter
+                      (clone-test-term-increasing-depth term)
+                      situation))
   (multiple-value-bind (holds? reason free-variables answer)
-      (prove interpreter (argument term))
+      (prove interpreter (argument term)
+             :solution-depth (solution-depth term))
     (cond (holds?
            (multiple-value-setq (term situation)
              (perform-substitutions-in-interpreter
               interpreter term situation free-variables answer))
            (maybe-output-execution-trace-information
-            "Successful test" term reason free-variables answer)
+            ">>> Successful test:" term reason free-variables answer)
            (values (the-no-operation-term interpreter)
                    (the-empty-program-term interpreter)
                    situation))
           (t
            (maybe-output-execution-trace-information
-            "Failed test" term reason free-variables answer)
+            ">>> Failed test:" term reason free-variables answer)
            (backtrack interpreter)))))
 
 (defmethod interpret-1
@@ -479,7 +496,7 @@ returned as first argument."))
                             :previous-situation situation)))
                  (t
                   (maybe-output-execution-trace-information
-                   "Storing" term reason free-variables answer)
+                   "Storing:" term reason free-variables answer)
                   (push term (stored-actions interpreter))
                   (values (the-no-operation-term interpreter)
                           (the-empty-program-term interpreter)
@@ -488,7 +505,7 @@ returned as first argument."))
                             :previous-situation situation)))))
           (t
            (maybe-output-execution-trace-information
-            "NOT Executing" term reason free-variables answer)
+            "NOT Executing:" term reason free-variables answer)
            (backtrack interpreter)))))
   
 (defun interpret-1-body-term (interpreter term situation)
@@ -542,7 +559,7 @@ returned as first argument."))
                           (shuffle (body term))
                           (reverse (body term))))))
         (setf (choice-points interpreter)
-              (append choice-points (choice-points interpreter)))
+              (append (choice-points interpreter) choice-points))
         (backtrack interpreter "Starting action choice"))))
 
 (defmethod interpret-1
@@ -566,7 +583,7 @@ returned as first argument."))
     (cerror "Continue execution anyway."
             'unbound-variable-during-online-execution))
   (unless (and (skip-noops interpreter) (typep term 'no-operation-term))
-    (format t "~&*** Performing Action ~25T~:W~60T**********~%"
+    (format t "~&*** Performing Action ~28T~:W~60T**********~%"
             (to-sexpr term))))
 
 

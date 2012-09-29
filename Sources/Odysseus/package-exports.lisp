@@ -12,6 +12,8 @@
     '(;; Errors
       #:runtime-error
       #:invalid-class
+      ;; Tracing
+      #:trace-odysseus-p #:trace-odysseus #:untrace-odysseus
       ;; MOP
       #:define-method
       ;; General utilities
@@ -24,6 +26,7 @@
       #:and3 #:or3 #:not3
       ;; Macros
       #:define-interning-make-instance
+      #:maybe-suppress-snark-output
       ;; Support for testing
       #:odysseus-suite
       #:odysseus-utilities-suite
@@ -109,6 +112,7 @@
       #:primitive-action-term
       #:no-operation-term #:no-operation
       #:test-term
+      #:solution-depth #:max-solution-depth
       #:sequence-term
       #:action-choice-term
       #:argument-choice-term
@@ -217,6 +221,12 @@
     '(#:initialize-snark
       #:set-up-theory
       #:*print-snark-output*
+      #:prove-or-refute
+      #:ida-prove-or-refute
+      #:snark-answer
+      #:compute-closure
+      #:prove-using-snark-depth-zero
+      #:prove-using-snark-closure
       #:prove-using-snark))
   
   (defvar *odysseus-interpreter-exports*
@@ -250,8 +260,6 @@
       #:the-empty-program-term #:the-no-operation-term
       #:declare-primitive-action
       #:declare-relational-fluent #:declare-functional-fluent
-
-      #:trace-odysseus #:untrace-odysseus
 
       #:top-level-context
       #:basic-interpreter

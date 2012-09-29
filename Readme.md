@@ -102,46 +102,96 @@ To run the test suite for *Odysseus*, enter the commands
 
 ### Working with the interpreters
 
-You can work interactively with *Odysseus* in the following way:
+The *Iliad* implementation contains a number of examples.  You can
+run the examples for *Odysseus* in the following way:
 
-    CL-USER> (asdf:load-system :iliad)
+    CL-USER> (asdf:load-system :odysseus-examples)
     T
     CL-USER> (in-package :odysseus-user)
-    #<PACKAGE "ODYSSEUS-USER">
-    ODYSSEUS-USER> (define-primitive-action eat '(person))
-    #<STANDARD-METHOD DECLARE-PRIMITIVE-ACTION ((EQL EAT) COMPILATION-CONTEXT) {1006C74063}>
-    ODYSSEUS-USER> (declare-primitive-action 'eat (default-interpreter))
-    #<PRIMITIVE-ACTION-DEFINITION {1006E89BC3}>
-    ODYSSEUS-USER> (define-primitive-action sleep '(person))
-    #<STANDARD-METHOD DECLARE-PRIMITIVE-ACTION ((EQL SLEEP) COMPILATION-CONTEXT) {10074436C3}>
-    ODYSSEUS-USER> (declare-primitive-action 'sleep (default-interpreter))
-    #<PRIMITIVE-ACTION-DEFINITION {1007552113}>
-    ODYSSEUS-USER> (define-primitive-action celebrate '(person))
-    #<STANDARD-METHOD DECLARE-PRIMITIVE-ACTION ((EQL CELEBRATE) COMPILATION-CONTEXT) {1007645983}>
-    ODYSSEUS-USER> (declare-primitive-action 'celebrate (default-interpreter))
-    #<PRIMITIVE-ACTION-DEFINITION {100775A423}>
-    ODYSSEUS-USER> (interpret
-        		'(seq
-        		  (eat something)
-        		  (sleep several hours)
-        		  (celebrate)))
-    >>> Executing            (EAT SOMETHING):
-      Reason:                NO-PRECONDITION
-    *** Performing Action    (EAT SOMETHING)                    **********
-    >>> Executing            (SLEEP SEVERAL HOURS):
-      Reason:                NO-PRECONDITION
-    *** Performing Action    (SLEEP SEVERAL HOURS)              **********
-    >>> Executing            (CELEBRATE):
-      Reason:                NO-PRECONDITION
-    *** Performing Action    (CELEBRATE)                        **********
-    (DO (CELEBRATE)
-        (DO
-         (SLEEP SEVERAL HOURS)
-         (DO (EAT
-              SOMETHING)
-             S0)))
+    #<Package "ODYSSEUS-USER">
+    ODYSSEUS-USER> (run-example 'interpret-16)
+    Running example INTERPRET-16 in mode ONLINE.
+    Source code:                (SEARCH (WORK ANNABELLE)
+                                        (CHOOSE
+                                         (HOLDS (FEMALE ?P.PERSON))
+                                         (HOLDS (MALE ?P.PERSON)))
+                                        (CELEBRATE ?P.PERSON)
+                                        (HOLDS (MALE ?P.PERSON)))
+    Storing:                    (WORK ANNABELLE)
+        Reason:                 NO-PRECONDITION
+    Starting action choice.
+    Trying to prove or refute:  (MALE #:?P2924.PERSON)
+    >>> Successful test:        (HOLDS? (MALE MATTHIAS))
+        Reason:                 PROOF-FOUND
+        Free Variables:         (#:?P2924.PERSON)
+        Answer:                 (ANSWER MATTHIAS)
+    Trying to prove or refute:  (POSS (CELEBRATE MATTHIAS)
+                                 (DO (WORK ANNABELLE) S0 ))
+    Cannot decide:              (POSS (CELEBRATE MATTHIAS)
+                                 (DO (WORK ANNABELLE) S0 ))
+    NOT Executing:              (CELEBRATE MATTHIAS)
+        Reason:                 UNDECIDABLE
+    Backtracking.
+    Trying to prove or refute:  (FEMALE #:?P2924.PERSON)
+    >>> Successful test:        (HOLDS? (FEMALE ANNABELLE))
+        Reason:                 PROOF-FOUND
+        Free Variables:         (#:?P2924.PERSON)
+        Answer:                 (ANSWER ANNABELLE)
+    Trying to prove or refute:  (POSS (CELEBRATE ANNABELLE)
+                                 (DO (WORK ANNABELLE) S0 ))
+    Refutation found for:       (POSS (CELEBRATE ANNABELLE)
+                                 (DO (WORK ANNABELLE) S0 ))
+    NOT Executing:              (CELEBRATE ANNABELLE)
+        Reason:                 REFUTATION-FOUND
+    Backtracking.
+    Trying to prove:            (MALE #:?P2924.PERSON)
+    >>> Successful test:        (HOLDS? (MALE LENZ))
+        Reason:                 PROOF-FOUND
+        Free Variables:         (#:?P2924.PERSON)
+        Answer:                 (ANSWER LENZ)
+    Trying to prove or refute:  (POSS (CELEBRATE LENZ)
+                                 (DO (WORK ANNABELLE) S0 ))
+    Refutation found for:       (POSS (CELEBRATE LENZ)
+                                 (DO (WORK ANNABELLE) S0 ))
+    NOT Executing:              (CELEBRATE LENZ)
+        Reason:                 REFUTATION-FOUND
+    Backtracking.
+    Trying to prove:            (FEMALE #:?P2924.PERSON)
+    Cannot decide:              (FEMALE #:?P2924.PERSON)
+    >>> Failed test:            (HOLDS? (FEMALE #:?P2924.PERSON)
+                                 :SOLUTION-DEPTH 1)
+        Reason:                 UNDECIDABLE
+        Free Variables:         (#:?P2924.PERSON)
+        Answer:                 NIL
+    Backtracking.
+    Trying to prove:            (MALE #:?P2924.PERSON)
+    >>> Successful test:        (HOLDS? (MALE LAITH))
+        Reason:                 PROOF-FOUND
+        Free Variables:         (#:?P2924.PERSON)
+        Answer:                 (ANSWER LAITH)
+    Trying to prove or refute:  (POSS (CELEBRATE LAITH)
+                                 (DO (WORK ANNABELLE) S0 ))
+    Storing:                    (CELEBRATE LAITH)
+        Reason:                 PROOF-FOUND
+    Trying to prove or refute:  (MALE LAITH)
+    >>> Successful test:        (HOLDS? (MALE LAITH))
+        Reason:                 PROOF-FOUND
+    >>> Executing stored actions.
+    *** Performing Action       (WORK ANNABELLE)                **********
+    *** Performing Action       (CELEBRATE LAITH)               **********
+    Result:                     (DO (CELEBRATE LAITH)
+                                    (DO (WORK ANNABELLE) S0) )
+    
+    NIL
     ODYSSEUS-USER> 
 
+The actual execution of the program on your system may differ since
+the default execution mode of *Odysseus* is random resolution of
+non-deterministic choices, however the final answer should always be
+the same as shown in the example.  Look into the file
+`Sources/Odysseus/examples.lisp` to see how to write your own
+specifications or programs.  More documentation will be forthcoming in
+the near future.
 
 Supported Lisp Implementations
 ------------------------------

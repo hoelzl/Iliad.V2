@@ -5,7 +5,7 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-utilities)
+(in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 
@@ -39,6 +39,22 @@
              (with-slots (thing sort-1 sort-2) condition
                (format stream "Incompatible sort declarations for ~W: ~W, ~W."
                        thing sort-1 sort-2)))))
+
+
+;;; Tracing
+;;; -------
+
+(defvar *trace-odysseus* t)
+
+(defun trace-odysseus-p ()
+  *trace-odysseus*)
+
+(defun trace-odysseus ()
+  (setf *trace-odysseus* t))
+
+(defun untrace-odysseus ()
+  (setf *trace-odysseus* nil))
+
 
 ;;; General utilities
 ;;; =================

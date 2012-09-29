@@ -58,13 +58,13 @@
       (setf (onlinep interpreter) (eql execution-mode :online))
       (format t "~&Running example ~A in mode ~A.~%"
 	      (name example) execution-mode)
-      (format t "~&Source code: ~25T~:W~%" (term example))
+      (format t "~&Source code: ~28T~:W~%" (term example))
       (multiple-value-bind (result success?)
           (apply 'interpret
                  (full-source-code example)
                  :interpreter interpreter
                  (keys example))
-	(format t "~&~:[Aborted with error~;Result~]: ~:W~2&" success? result)))))
+	(format t "~&~:[Execution terminated~;Result~]:~28T~:W~2&" success? result)))))
 
 (defun run-examples (examples &optional (execution-mode :online))
   (mapc (lambda (example)

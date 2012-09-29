@@ -16,7 +16,7 @@
   (let* ((cu (make-instance 'compilation-unit))
          (ops (known-operators cu)))
     (5am:is-true (typep ops 'hash-table))
-    (doplist (op type syntax::*logical-operators*)
+    (doplist (op type odysseus::*logical-operators*)
       (5am:is (eql type (gethash op ops nil))))))
 
 #+5am
@@ -35,7 +35,7 @@
 (5am:test (test-global-lookup-for-variable
            :compile-at :definition-time)
   (let* ((cu (make-instance 'compilation-unit))
-         (vars (syntax::variable-hash-table cu)))
+         (vars (odysseus::variable-hash-table cu)))
     (5am:is (= (hash-table-count vars) 0))
     (5am:is (eql (lookup-variable 'foo 'foo-sort cu nil) nil))
     (5am:is (= (hash-table-count vars) 0))
@@ -57,7 +57,7 @@
 (5am:test (test-local-lookup-for-variable
            :compile-at :definition-time)
   (let* ((cu (make-instance 'compilation-unit))
-         (vars (syntax::variable-hash-table cu))
+         (vars (odysseus::variable-hash-table cu))
          (lc (make-instance 'local-context :enclosing-context cu)))
     (5am:is (eql (local-variables lc) '()))
     (5am:is (eql (lookup-variable 'foo 'foo-sort lc nil) nil))
@@ -108,7 +108,7 @@
 (5am:test (test-global-lookup-for-number
            :compile-at :definition-time)
   (let* ((cu (make-instance 'compilation-unit))
-         (nums (syntax::number-hash-table cu)))
+         (nums (odysseus::number-hash-table cu)))
     (5am:is (= (hash-table-count nums) 0))
     (5am:is (eql (lookup-number 1 cu nil) nil))
     (5am:is (= (hash-table-count nums) 0))
@@ -162,7 +162,7 @@
 (5am:test (test-global-lookup-for-functor
            :compile-at :definition-time)
   (let* ((cu (make-instance 'compilation-unit))
-         (funs (syntax::functor-hash-table cu)))
+         (funs (odysseus::functor-hash-table cu)))
     (5am:is (= (hash-table-count funs) 0))
     (5am:is (eql (lookup-functor 'foo 2 cu nil) nil))
     (let ((foo/2 (lookup-functor 'foo 2 cu t))
@@ -181,7 +181,7 @@
 (5am:test (test-local-lookup-for-functor
            :compile-at :definition-time)
   (let* ((cu (make-instance 'compilation-unit))
-         (funs (syntax::functor-hash-table cu))
+         (funs (odysseus::functor-hash-table cu))
          (lc (make-instance 'local-context :enclosing-context cu)))
     (5am:is (= (hash-table-count funs) 0))
     (5am:is (eql (lookup-functor 'foo 2 lc nil) nil))
