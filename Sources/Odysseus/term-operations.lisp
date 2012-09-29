@@ -413,6 +413,7 @@
              (name declaration)
              (1- (length signature))
              :sort signature
+             :injective t
              keywords))
     :primitive-action/declare-function)
   
@@ -433,6 +434,7 @@
              (name declaration)
              (1- (length signature))
              :sort signature
+             :injective t
              (keywords declaration)))
     :fluent/declare-function))
 

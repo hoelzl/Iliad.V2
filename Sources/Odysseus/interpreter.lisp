@@ -507,9 +507,20 @@ returned as first argument."))
            (maybe-output-execution-trace-information
             "NOT Executing:" term reason free-variables answer)
            (backtrack interpreter)))))
-  
+
+(defvar *optimize-interpretation-of-declarations* t)
+
 (defun interpret-1-body-term (interpreter term situation)
   (let ((body (body term)))
+    ;; Since most programs start with a long list of declarations that do
+    ;; nothing, pick them off here.  This makes the traces of INTERPRET-1 more
+    ;; readable.  (It is also marginally faster, but the difference is
+    ;; negligible).
+    (when *optimize-interpretation-of-declarations*
+      (iterate (repeat (length body))
+        (if (typep (first body) 'declaration-term)
+            (setf body (rest body))
+            (leave))))
     (cond ((null body)
 	   (interpret-1 interpreter
                         (the-empty-program-term interpreter)
@@ -564,6 +575,9 @@ returned as first argument."))
 
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term declaration-term) situation)
+  ;; NOTE: The implementation of INTERPRET-1 for sequence terms picks off
+  ;; declarations at the start of sequences.  Therefore, if the implementation
+  ;; of this method changes you need to adjust INTERPRET-1-BODY-TERM as well.
   (values (the-no-operation-term interpreter)
           (the-empty-program-term interpreter)
           situation))
