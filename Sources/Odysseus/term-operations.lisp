@@ -6,6 +6,8 @@
 ;;; in the root directory for further information.
 
 (in-package #:odysseus-syntax)
+#+debug-odysseus
+(declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 
 (defgeneric to-sexpr (term)
   (:documentation
@@ -201,80 +203,6 @@
                                     term-or-situation)))
              (substitute-terms (rest new-terms) (rest old-terms) new-term))))))
 
-(defmethod process-declaration-for-snark ((declaration sort-declaration-term))
-  (apply #'snark:declare-sort (declared-sort declaration) (keywords declaration))
-  :declare-sort)
-
-(defmethod process-declaration-for-snark ((declaration subsort-declaration-term))
-  (apply #'snark:declare-subsort
-         (declared-sort declaration) (supersort declaration) (keywords declaration))
-  :declare-subsort)
-
-(defmethod process-declaration-for-snark ((declaration sorts-incompatible-declaration-term))
-  (apply #'snark:declare-sorts-incompatible (sorts declaration))
-  :declare-sorts-incompatible)
-
-(defmethod process-declaration-for-snark ((declaration constant-declaration-term))
-  (apply #'snark:declare-constant (name declaration) (keywords declaration))
-  :declare-constant)
-
-(defmethod process-declaration-for-snark ((declaration function-declaration-term))
-  (apply #'snark:declare-function (name declaration) (arity declaration) (keywords declaration))
-  :declare-function)
-
-(defmethod process-declaration-for-snark ((declaration relation-declaration-term))
-  (apply #'snark:declare-relation (name declaration) (arity declaration) (keywords declaration))
-  :declare-relation)
-
-(defmethod process-declaration-for-snark ((declaration ordering-declaration-term))
-  (apply #'snark:declare-ordering-greaterp (ordered-symbols declaration))
-  :declare-ordering-greaterp)
-
-(defmethod process-declaration-for-snark ((declaration logical-assertion-term))
-  (apply #'snark::assert
-         (to-sexpr (sentence declaration))
-         (keywords declaration))
-  :assert)
-
-(defmethod process-declaration-for-snark ((declaration logical-assumption-term))
-  (apply #'snark:assume
-         (to-sexpr (sentence declaration))
-         (keywords declaration))
-  :assume)
-
-(defmethod process-declaration-for-snark ((declaration rewrite-assertion-term))
-  (apply #'snark:assert-rewrite
-         (to-sexpr (sentence declaration))
-         (keywords declaration))
-  :assert-rewrite)
-
-(defmethod process-declaration-for-snark ((declaration primitive-action-declaration-term))
-  (let ((signature (signature declaration))
-        (keywords (remove-from-plist (keywords declaration) :precondition)))
-    (apply #'snark:declare-function
-           (name declaration)
-           (1- (length signature))
-           :sort signature
-           keywords))
-  :primitive-action/declare-function)
-
-(defmethod process-declaration-for-snark ((declaration relational-fluent-declaration-term))
-  (let ((signature (signature declaration)))
-    (apply #'snark:declare-relation
-           (name declaration)
-           (length signature)
-           :sort signature
-           (keywords declaration)))
-  :fluent/declare-relation)
-
-(defmethod process-declaration-for-snark ((declaration functional-fluent-declaration-term))
-  (let ((signature (signature declaration)))
-    (apply #'snark:declare-function
-           (name declaration)
-           (1- (length signature))
-           :sort signature
-           (keywords declaration)))
-  :fluent/declare-function)
 
 ;;; Generating Unique Names Axioms
 ;;; ==============================
@@ -354,9 +282,84 @@
   (:documentation
    "Process DECLARATION so that the declared entity exists in Snark's
    theory.")
+  
   (:method (declaration)
     (cerror "Continue without processing the declaration."
-            'invalid-declaration-type :declaration declaration)))
+            'invalid-declaration-type :declaration declaration))
+  (:method ((declaration sort-declaration-term))
+    (apply #'snark:declare-sort (declared-sort declaration) (keywords declaration))
+    :declare-sort)
+  
+  (:method ((declaration subsort-declaration-term))
+    (apply #'snark:declare-subsort
+           (declared-sort declaration) (supersort declaration) (keywords declaration))
+    :declare-subsort)
+  
+  (:method ((declaration sorts-incompatible-declaration-term))
+    (apply #'snark:declare-sorts-incompatible (sorts declaration))
+    :declare-sorts-incompatible)
+  
+  (:method ((declaration constant-declaration-term))
+    (apply #'snark:declare-constant (name declaration) (keywords declaration))
+    :declare-constant)
+  
+  (:method ((declaration function-declaration-term))
+    (apply #'snark:declare-function (name declaration) (arity declaration) (keywords declaration))
+    :declare-function)
+  
+  (:method ((declaration relation-declaration-term))
+    (apply #'snark:declare-relation (name declaration) (arity declaration) (keywords declaration))
+    :declare-relation)
+  
+  (:method ((declaration ordering-declaration-term))
+    (apply #'snark:declare-ordering-greaterp (ordered-symbols declaration))
+    :declare-ordering-greaterp)
+  
+  (:method ((declaration logical-assertion-term))
+    (apply #'snark::assert
+           (to-sexpr (sentence declaration))
+           (keywords declaration))
+    :assert)
+  
+  (:method ((declaration logical-assumption-term))
+    (apply #'snark:assume
+           (to-sexpr (sentence declaration))
+           (keywords declaration))
+    :assume)
+  
+  (:method ((declaration rewrite-assertion-term))
+    (apply #'snark:assert-rewrite
+           (to-sexpr (sentence declaration))
+           (keywords declaration))
+    :assert-rewrite)
+  
+  (:method ((declaration primitive-action-declaration-term))
+    (let ((signature (signature declaration))
+          (keywords (remove-from-plist (keywords declaration) :precondition)))
+      (apply #'snark:declare-function
+             (name declaration)
+             (1- (length signature))
+             :sort signature
+             keywords))
+    :primitive-action/declare-function)
+  
+  (:method ((declaration relational-fluent-declaration-term))
+    (let ((signature (signature declaration)))
+      (apply #'snark:declare-relation
+             (name declaration)
+             (length signature)
+             :sort signature
+             (keywords declaration)))
+    :fluent/declare-relation)
+  
+  (:method ((declaration functional-fluent-declaration-term))
+    (let ((signature (signature declaration)))
+      (apply #'snark:declare-function
+             (name declaration)
+             (1- (length signature))
+             :sort signature
+             (keywords declaration)))
+    :fluent/declare-function))
 
 (defgeneric set-up-snark (compilation-context)
   (:documentation

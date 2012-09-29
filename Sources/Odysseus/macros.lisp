@@ -6,6 +6,8 @@
 ;;; in the root directory for further information.
 
 (in-package #:odysseus-utilities)
+#+debug-odysseus
+(declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 #+5am
 (5am:in-suite odysseus-macro-suite)
 
