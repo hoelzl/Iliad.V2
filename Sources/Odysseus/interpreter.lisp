@@ -81,6 +81,10 @@ suitable for storing it in a choice point."))
   (:documentation
    "Restores INTERPRETER to the state in which NEW-MEMENTO was captured."))
 
+(defgeneric prove (interpreter term)
+  (:documentation
+   "Try to prove or refute TERM in INTERPRETER."))
+
 (defgeneric can-execute-p (interpreter primitive-action-term situation)
   (:documentation
    "Returns true if it is possible to execute PRIMITIVE-ACTION-TERM in
@@ -441,7 +445,21 @@ returned as first argument."))
 
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term test-term) situation)
-  ())
+  (multiple-value-bind (holds? reason free-variables answer)
+      (prove interpreter (argument term))
+    (cond (holds?
+           (multiple-value-setq (term situation)
+             (perform-substitutions-in-interpreter
+              interpreter term situation free-variables answer))
+           (maybe-output-execution-trace-information
+            "Successful test" term reason free-variables answer)
+           (values (the-no-operation-term interpreter)
+                   (the-empty-program-term interpreter)
+                   situation))
+          (t
+           (maybe-output-execution-trace-information
+            "Failed test" term reason free-variables answer)
+           (backtrack interpreter)))))
 
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term primitive-action-term) situation)

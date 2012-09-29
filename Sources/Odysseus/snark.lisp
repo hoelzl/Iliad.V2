@@ -28,8 +28,8 @@
   (print-options-when-starting nil)
   (print-summary-when-finished nil)
   (print-rows-when-derived nil)
-  (print-rows-when-finished t)
-  (print-agenda-when-finished t)
+  (print-rows-when-finished nil)
+  (print-agenda-when-finished nil)
   (run-time-limit 0.1)
   (use-conditional-answer-creation t)
   ;; (use-subsumption-by-false nil)
@@ -77,21 +77,27 @@
 (defgeneric prove-using-snark (term &rest args &key context answer)
   (:documentation
    "Prove TERM using SNARK.")
-  (:method ((term odysseus-syntax:term) &rest args &key &allow-other-keys)
+  (:method ((term odysseus-syntax:term) &rest args &key context answer)
+    (declare (ignore context answer))
     (apply 'prove-using-snark (odysseus-syntax:to-sexpr term) args))
   (:method ((term cons) &rest args &key context answer)
     (declare (ignore context))
     (unless answer
       (alexandria:remove-from-plistf args :answer))
-    (flet ((do-prove ()
-             (let ((result (apply 'ida-prove-or-refute term args)))
-               (case result
-                 (:proof-found
-                  (values t :proof-found (answer t)))
-                 (:refutation-found
-                  (values nil :refutation-found (answer t)))
-                 (otherwise
-                  (values nil :timeout nil))))))
+    (labels ((snark-answer ()
+               (let ((result (answer t)))
+                 (if (eql result snark-lisp:false)
+                     (rest answer)
+                     result)))
+             (do-prove ()
+               (let ((result (apply 'ida-prove-or-refute term args)))
+                 (case result
+                   (:proof-found
+                    (values t :proof-found (snark-answer)))
+                   (:refutation-found
+                    (values nil :refutation-found (snark-answer)))
+                   (otherwise
+                    (values nil :timeout nil))))))
       (if *print-snark-output*
           (do-prove)
           (with-no-output 

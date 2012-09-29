@@ -174,6 +174,14 @@
       :context (context term)
       :source :generated-term))
 
+  (:method (new-term old-term (term body-term))
+    (make-instance (class-of term)
+      :body (mapcar (lambda (arg)
+                      (substitute-term new-term old-term arg))
+                    (body term))
+      :context (context term)
+      :source :generated-term))
+
   ;; TODO: Whether and how to substitute into definition terms? --tc
 
   (:method (new-term old-term (term successor-situation))

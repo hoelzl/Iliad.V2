@@ -83,7 +83,7 @@ question mark."
   "Parse each argument for an application term into term representation in CONTEXT."
   (setf (arguments term)
         (mapcar (lambda (subexp)
-                  (parse-into-term-representation subexp context))
+                  (parse-into-term-representation (unquote subexp) context))
                 arguments)))
 
 (defmethod parse-arguments-for-term ((term body-term) arguments context)
@@ -242,11 +242,10 @@ If neither of these cases apply, return a primitive term."
 (defmethod parse-into-term-representation
     ((exp snark::variable) (context compilation-context))
   "Return a variable term corresponding to EXP in the current context."
-  (parse-into-term-representation
-   (intern (format nil "?SV~A.~A"
-                   (snark::variable-number exp)
-                   (snark::variable-sort exp)))
-   context))
+  (let ((name (make-symbol (format nil "?SV~A" (snark::variable-number exp)))))
+    (make-instance 'variable-term :name name :unique-name name
+                   :sort (snark::variable-sort exp) :context context
+                   :intern nil :is-bound-p nil)))
 
 (defmethod parse-into-term-representation ((exp cons) (context compilation-context))
   "Return a TERM-instance for EXP in CONTEXT.
