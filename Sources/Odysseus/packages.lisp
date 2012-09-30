@@ -11,6 +11,7 @@
   (:use #:common-lisp #:alexandria #:iterate)
   (:import-from #:snark-lisp
                 #:forall #:exists #:not #:iff)
+  (:nicknames #:od)
   (:export . #.*odysseus-utilities-exports*)
   (:export . #.*odysseus-context-exports*)
   (:export . #.*odysseus-term-exports*)

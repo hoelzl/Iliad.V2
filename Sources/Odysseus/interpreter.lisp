@@ -85,7 +85,8 @@ suitable for storing it in a choice point."))
   (:documentation
    "Try to prove or refute TERM in INTERPRETER."))
 
-(defgeneric can-execute-p (interpreter primitive-action-term situation)
+(defgeneric can-execute-p (interpreter primitive-action-term situation
+                           &key solution-depth)
   (:documentation
    "Returns true if it is possible to execute PRIMITIVE-ACTION-TERM in
    SITUATION, false otherwise."))
@@ -297,6 +298,8 @@ raises an error otherwise.")
 
 (defmethod prove ((interpreter basic-interpreter) (proof-term term)
                   &key (solution-depth 0))
+  ;; TODO: Handle substitutions for the bound variables, and introduce
+  ;; standard bound variable NOW for the current situation.
   (let* ((free-variables (free-variables proof-term))
          (free-variable-sexprs (mapcar 'to-sexpr free-variables)))
     (multiple-value-bind (result reason answer)
@@ -315,7 +318,8 @@ raises an error otherwise.")
 
 
 (defmethod can-execute-p
-    ((interpreter basic-interpreter) (term primitive-action-term) situation)
+    ((interpreter basic-interpreter) (term primitive-action-term) situation
+     &key (solution-depth 0))
   (let ((action-def (primitive-action-definition (operator term) interpreter)))
     (if (not (action-precondition action-def))
         ;; Terms without precondition can always execute.
@@ -325,7 +329,7 @@ raises an error otherwise.")
                              :operator 'poss
                              :arguments (list term situation)
                              :context (context interpreter))))
-          (prove interpreter proof-term)))))
+          (prove interpreter proof-term :solution-depth solution-depth)))))
 
 (defmethod execute-stored-actions ((interpreter basic-interpreter))
   (let ((actions (nreverse (stored-actions interpreter)))
@@ -457,14 +461,17 @@ returned as first argument."))
 
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term test-term) situation)
-  (when (< (solution-depth term) (max-solution-depth term))
-    (add-choice-point interpreter
-                      (clone-test-term-increasing-depth term)
-                      situation))
   (multiple-value-bind (holds? reason free-variables answer)
-      (prove interpreter (argument term)
+      (prove interpreter
+             (argument term)
              :solution-depth (solution-depth term))
     (cond (holds?
+           (when (and (not (onlinep interpreter))
+                      answer
+                      (< (solution-depth term) (max-solution-depth term)))
+             (add-choice-point interpreter
+                               (clone-multi-solution-term-increasing-depth term)
+                               situation))
            (multiple-value-setq (term situation)
              (perform-substitutions-in-interpreter
               interpreter term situation free-variables answer))
@@ -481,8 +488,15 @@ returned as first argument."))
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term primitive-action-term) situation)
   (multiple-value-bind (can-execute-p reason free-variables answer)
-      (can-execute-p interpreter term situation)
+      (can-execute-p interpreter term situation
+                     :solution-depth (solution-depth term))
     (cond (can-execute-p
+           (when (and (not (onlinep interpreter))
+                      answer
+                      (< (solution-depth term) (max-solution-depth term)))
+             (add-choice-point interpreter
+                               (clone-multi-solution-term-increasing-depth term)
+                               situation))
            (multiple-value-setq (term situation)
              (perform-substitutions-in-interpreter
               interpreter term situation free-variables answer))

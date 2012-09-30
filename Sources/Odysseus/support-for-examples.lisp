@@ -28,6 +28,9 @@
 	 :initform (required-argument :term))
    (set-up-function :accessor set-up-function :initarg :set-up-function
                     :initform (required-argument :set-up-function))
+   (max-solution-depth :accessor max-solution-depth 
+                       :initarg :max-solution-depth
+                       :initform odysseus::*default-max-solution-depth*)
    (keys :accessor keys :initarg :keys
 	 :initform '())
    (hidden? :accessor hidden? :initarg :hidden?
@@ -59,12 +62,13 @@
       (format t "~&Running example ~A in mode ~A.~%"
 	      (name example) execution-mode)
       (format t "~&Source code: ~28T~:W~%" (term example))
-      (multiple-value-bind (result success?)
-          (apply 'interpret
-                 (full-source-code example)
-                 :interpreter interpreter
-                 (keys example))
-	(format t "~&~:[Execution terminated~;Result~]:~28T~:W~2&" success? result)))))
+      (let ((odysseus::*default-max-solution-depth* (max-solution-depth example)))
+        (multiple-value-bind (result success?)
+            (apply 'interpret
+                   (full-source-code example)
+                   :interpreter interpreter
+                   (keys example))
+          (format t "~&~:[Execution terminated~;Result~]:~28T~:W~2&" success? result))))))
 
 (defun run-examples (examples &optional (execution-mode :online))
   (mapc (lambda (example)

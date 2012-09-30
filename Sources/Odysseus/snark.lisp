@@ -34,10 +34,11 @@
   (print-rows-when-finished nil)
   (print-agenda-when-finished nil)
   (run-time-limit run-time-limit)
-  (use-conditional-answer-creation t)
+  ;; (use-conditional-answer-creation t)
   ;; (use-subsumption-by-false nil)
-  (use-constructive-answer-restriction nil)
-  (allow-skolem-symbols-in-answers nil))
+  ;; (use-constructive-answer-restriction nil)
+  (allow-skolem-symbols-in-answers t)
+  )
 
 
 (defun prove-or-refute (term &rest args
@@ -64,12 +65,12 @@
 	   (:agenda-empty :agenda-empty)
 	   (:run-time-limit :run-time-limit)))))))
 
-(defvar *print-time-increases* nil)
+(defvar *trace-ida-time-increases* nil)
 
 (defun ida-prove-or-refute (term &rest args &key &allow-other-keys)
-  (let* ((initial-run-time-limit 0.1)
+  (let* ((initial-run-time-limit 0.05)
 	 (run-time-limit initial-run-time-limit)
-	 (iterations 5))
+	 (iterations 4))
     (alexandria:remove-from-plistf args :run-time-limit)
     (dotimes (i iterations)
       (let ((result (apply 'prove-or-refute term
@@ -77,7 +78,7 @@
                            args)))
 	(if (eql result :run-time-limit)
 	    (progn
-              (when (and (trace-odysseus-p) *print-time-increases*)
+              (when (and (trace-odysseus-p) *trace-ida-time-increases*)
                 (format t "~&Run time limit reached.  Extending time for proof search.~%"))
               (setf run-time-limit (* 2 run-time-limit)))
 	    (return-from ida-prove-or-refute result))))
@@ -119,7 +120,8 @@
 
 (defun prove-using-snark-depth-zero (term args)
   (when (trace-odysseus-p)
-    (format t "~&Trying to prove or refute:~28T~:W~%" term))
+    (format t "~&Trying to prove or refute:~28T~:W~%" term)
+    (format t "~&    Solution depth:~28T0~%"))
   (let ((result (apply 'ida-prove-or-refute term args)))
     (case result
       (:proof-found
@@ -133,7 +135,8 @@
 
 (defun prove-using-snark-closure (term solution-depth answer)
   (when (trace-odysseus-p)
-    (format t "~&Trying to prove:~28T~:W" term))
+    (format t "~&Trying to prove:~28T~:W" term)
+    (format t "~&    Solution depth:~28T~A~%" solution-depth))
   (let ((result (maybe-suppress-snark-output
                   (snark:prove term :answer answer))))
     (ecase result

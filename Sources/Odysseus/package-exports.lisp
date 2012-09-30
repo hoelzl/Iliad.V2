@@ -244,7 +244,10 @@
       #:can-execute-p
       #:choice-point
       #:term #:situation #:interpreter-memento
-      #:make-choice-point #:next-choice-point #:backtrack
+      #:make-choice-point
+      #:add-choice-point
+      #:next-choice-point
+      #:backtrack
       #:stored-actions
       #:execute-stored-actions #:execute-primitive-action
       #:state-map #:can-set-state-p #:state
@@ -253,6 +256,11 @@
 
       ;; TODO: should belong to the configuration framework.
       #:*permute-offline-choice*
+      #:*trace-precondition-processing*
+      #:*trace-declaration-processing*
+      #:*trace-unique-name-axiom-processing*
+      #:*trace-ida-time-increases*
+      #:*default-max-solution-depth*
 
       #:primitive-action-definition
       ;; These are originally exported from the context exports.  Not sure if

@@ -104,13 +104,13 @@ etc. for this context."))
   (:documentation
    "Returns an instance of EMPTY-PROGRAM-TERM for CONTEXT that might be interned.")
   (:method ((context compilation-context))
-    (make-instance 'syntax:empty-program-term :context context)))
+    (make-instance 'empty-program-term :context context)))
 
 (defgeneric the-no-operation-term (context)
   (:documentation
    "Returns an instance of NO-OPERATION-TERM for CONTEXT that might be interned.")
   (:method ((context compilation-context))
-    (make-instance 'syntax:no-operation-term :context context)))   
+    (make-instance 'no-operation-term :context context)))
 
 ;;; Methods for Obtaining Primitive Actions
 ;;; ---------------------------------------

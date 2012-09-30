@@ -256,9 +256,13 @@ If neither of these cases apply, return a primitive term."
 (defmethod parse-into-term-representation
     ((exp snark::variable) (context compilation-context))
   "Return a variable term corresponding to EXP in the current context."
-  (let ((name (make-symbol (format nil "?SV~A" (snark::variable-number exp)))))
+  (let* ((sort (snark-feature::feature-name (snark::variable-sort exp)))
+         (name (make-symbol (format nil "?SV~A.~A"
+                                    (snark::variable-number exp)
+                                    sort))))
     (make-instance 'variable-term :name name :unique-name name
-                   :sort (snark::variable-sort exp) :context context
+                   :sort sort
+                   :context context
                    :intern nil :is-bound-p nil)))
 
 (defmethod parse-into-term-representation ((exp cons) (context compilation-context))

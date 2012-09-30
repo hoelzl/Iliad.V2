@@ -115,6 +115,14 @@
   (print-unreadable-object (term stream :type t :identity t)
     (format stream "~A~:[~;~:*~W~]" (operator term) (action-precondition term))))
 
+(defmethod print-object ((term primitive-action-term) stream)
+  (print-unreadable-object (term stream :type t)
+    (format stream "~W~:[~; :SOLUTION-DEPTH ~:*~A~]~:[~; :MAX-SOLUTION-DEPTH ~:*~A~]"
+            (to-sexpr term)
+            (when (not (zerop (solution-depth term)))
+              (solution-depth term))
+            (when (not (= *default-max-solution-depth* (max-solution-depth term)))
+              (max-solution-depth term)))))
 
 (defgeneric free-variables (term)
   (:documentation
@@ -382,13 +390,14 @@
     :declare-ordering-greaterp)
   
   (:method ((declaration logical-assertion-term) &key rewrite-too)
+    (when (getf (keywords declaration) :rewrite-too)
+      (remove-from-plistf (keywords declaration) :rewrite-too)
+      (setf rewrite-too t))
     (apply #'snark::assert
            (to-sexpr (sentence declaration))
            (keywords declaration))
     (when rewrite-too
-      (apply #'snark::assert-rewrite
-             (to-sexpr (sentence declaration))
-             (keywords declaration)))
+      (snark::assert-rewrite (to-sexpr (sentence declaration))))
     :assert)
   
   (:method ((declaration logical-assumption-term) &key rewrite-too)
@@ -438,21 +447,27 @@
              (keywords declaration)))
     :fluent/declare-function))
 
+(defvar *trace-declaration-processing* nil)
 (defvar *trace-precondition-processing* nil)
+(defvar *trace-unique-name-axiom-processing* nil)
 
 (defgeneric set-up-snark (compilation-context)
   (:documentation
    "Set up Snark to prove things in COMPILATION-CONTEXT.")
   (:method ((context compilation-context))
     (iterate (for declaration in-sequence (declarations context))
+      (when (and (trace-odysseus-p) *trace-declaration-processing*)
+        (format t "~&Processing declaration:~28T~:W" declaration))
       (process-declaration-for-snark declaration))
     (iterate (for (nil action) in-hashtable (primitive-actions context))
       (let ((precondition (action-precondition action)))
         (when precondition
           (when (and (trace-odysseus-p) *trace-precondition-processing*)
-            (format t "~&Processing precondition~28T~:W."
+            (format t "~&Processing precondition:~28T~:W"
                     precondition))
           (process-declaration-for-snark precondition :rewrite-too t))))
     (iterate (for declaration in-sequence (make-unique-names-axioms context))
+      (when (and (trace-odysseus-p) *trace-unique-name-axiom-processing*)
+        (format t "~&Processing unique names axiom:~28T~:W" declaration))
       (process-declaration-for-snark declaration))
     :snark-setup-completed))

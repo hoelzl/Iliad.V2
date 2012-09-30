@@ -9,16 +9,6 @@
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 
-(defvar *is-rested-p-axiom*
-  '(forall ((p :sort person)
-            (a :sort action)
-            (s :sort situation))
-    (iff (is-rested-p p (do a s))
-     (or ;; (and (not (is-rested p s)) (= a (sleep p)))
-      (= a (sleep p))
-      (and (is-rested-p p s)
-       (not (= a (work p))))))))
-
 (defun set-up-ewsc-theory ()
   `(seq
     (declare-sort 'situation)
@@ -40,8 +30,9 @@
     (declare-unique-constant 'lenz :sort 'person)
     (declare-unique-constant 'matthias :sort 'person)
     
-    ;; Fluent
+    ;; Fluents
     (declare-relational-fluent 'is-rested-p '(person situation))
+    (declare-relational-fluent 'is-parent-p '(person situation))
 
     ;; Actions
     (declare-primitive-action 'eat '(action person))
@@ -50,15 +41,32 @@
     (declare-primitive-action 'celebrate '(action person)
       :precondition '(iff (poss (celebrate ?p.person) ?s.situation)
                           (is-rested-p ?p.person ?s.situation)))
-  
+    (declare-primitive-action 'hold-family-meeting '(action person)
+      :precondition '(iff (poss (hold-family-meeting ?p.person) ?s.situation)
+                          (is-parent-p ?p.person ?s.situation)))
+
     (declare-unique-function 'no-operation 0
                              :sort '(action)
                              :injective t)
   
-    ;; Axioms
-    (assert  ',*is-rested-p-axiom*
-             :supported nil :sequential t)
-    (assert-rewrite ',*is-rested-p-axiom*)
+    ;; Axiom for IS-RESTED-P
+    (assert '(forall ((p :sort person)
+                      (a :sort action)
+                      (s :sort situation))
+              (iff (is-rested-p p (do a s))
+               (or ;; (and (not (is-rested p s)) (= a (sleep p)))
+                (= a (sleep p))
+                (and (is-rested-p p s)
+                 (not (= a (work p)))))))
+                 :rewrite-too t :supported nil :sequential t)
+
+    ;; Axiom for IS-PARENT-P
+    (assert '(forall ((p :sort person)
+                      (a :sort action)
+                      (s :sort situation))
+              (iff (is-parent-p p (do a s))
+               (is-parent-p p s)))
+            :rewrite-too t :supported nil :sequential t)
   
     ;; Initial situation
     (assert '(is-rested-p annabelle s0)
@@ -79,6 +87,8 @@
     (assert '(male laith))
     (assert '(male lenz))
     (assert '(male matthias))
+    (assert '(is-parent-p laith s0))
+    (assert '(not (is-parent-p matthias s0)))
     ))
 
 #+(or)
@@ -144,15 +154,14 @@
    (celebrate ?p.person)))
 
 (defexample interpret-06a (:set-up-function 'set-up-ewsc-theory
-                           :hidden? t
-                          :keys '(:error-value :nobody-can-work-and-celebrate))
+                           :hidden? t)
   (seq
    (work ?p.person)
    (celebrate ?p.person)))
 
 (defexample interpret-06b (:set-up-function 'set-up-ewsc-theory
                            :hidden? t
-                          :keys '(:error-value :nobody-can-work-and-celebrate))
+                           :keys '(:error-value :nobody-can-work-and-celebrate))
   (search
    (seq
     (work ?p.person)
@@ -353,9 +362,35 @@
    (celebrate ?p.person)))
 
 (defexample interpret-10 (:set-up-function 'set-up-ewsc-theory)
-  (choose
+  (search
    (sleep ?p.person)
-   (celebrate ?p.person)))
+   (celebrate ?p.person)
+   (holds (male ?p.person))
+   (work ?p.person)))
+
+(defexample interpret-10a (:set-up-function 'set-up-ewsc-theory
+                           :hidden? nil)
+  (search
+   (sleep ?p.person)
+   (celebrate ?p.person)
+   (holds (male ?p.person))
+   (work ?p.person)
+   (hold-family-meeting ?p.person)))
+
+(defexample interpret-10b (:set-up-function 'set-up-ewsc-theory
+                           :hidden? nil)
+  (search
+   (sleep ?p.person)
+   (celebrate ?p.person)
+   (work ?p.person)
+   (hold-family-meeting ?p.person)))
+
+(defexample interpret-10c (:set-up-function 'set-up-ewsc-theory
+                           :hidden? t)
+  (search
+   (celebrate ?p.person)
+   (work ?p.person)
+   (hold-family-meeting ?p.person)))
 
 (defexample interpret-11 (:set-up-function 'set-up-ewsc-theory)
   (search
