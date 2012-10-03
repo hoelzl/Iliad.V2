@@ -107,13 +107,17 @@ suitable for storing it in a choice point."))
 (defgeneric backtrack (interpreter &optional reason)
   (:documentation
    "Abandons the current computation and continues execution of the
-   interpreter at the previous choice point.  Reason is a reason for
-   diagnostic purposes."))
+   interpreter at the previous choice point.  REASON is only for diagnostic
+   purposes."))
 
 (defgeneric stored-actions (interpreter)
   (:documentation
    "The actions stored during the offline execution of the interpreter, in
     reverse order in which they should be executed."))
+
+(defgeneric (setf stored-actions) (new-actions interpreter)
+  (:documentation
+   "Updates the action stored during offline execution."))
 
 (defgeneric execute-stored-actions (interpreter)
   (:documentation
@@ -122,10 +126,6 @@ suitable for storing it in a choice point."))
 (defgeneric execute-primitive-action (interpreter term)
   (:documentation
    "Execute the primitive action TERM for INTEPRETER."))
-
-(defgeneric (setf stored-actions) (new-actions interpreter)
-  (:documentation
-   "Updates the action stored during offline execution."))
 
 (defgeneric state-map (interpreter)
   (:documentation
@@ -155,13 +155,13 @@ raises an error otherwise.")
           (cond (errorp
                  (restart-case
                      (error 'no-state-for-situation :situation situation)
-                   (provide-state (situation)
+                   (provide-state (state)
                      :test (lambda () (can-set-state-p interpreter situation))
                      :report "Provide a state for the situation."
                      :interactive (lambda ()
                                     (format t "Enter a new situation: ")
                                     (list (eval (read))))
-                     (setf (state interpreter situation) situation))))
+                     (setf (state interpreter situation) state))))
                 (t nil))))))
 
 (defgeneric (setf state) (new-state interpreter situation)
@@ -267,7 +267,10 @@ raises an error otherwise.")
         (onlinep interpreter) t))
 
 (defclass basic-interpreter-memento ()
-  ((stored-actions
+  ((state-map
+    :accessor state-map :initarg :state-map
+    :initform (required-argument :state-map))
+   (stored-actions
     :accessor stored-actions :initarg :stored-actions
     :initform (required-argument :stored-actions))
    (stored-continuations
@@ -281,40 +284,45 @@ raises an error otherwise.")
 
 (defmethod interpreter-memento ((interpreter basic-interpreter))
   (make-instance 'basic-interpreter-memento
-                 :stored-actions (stored-actions interpreter)
-                 :stored-continuations (stored-continuations interpreter)
-                 :onlinep (onlinep interpreter)))
+    :state-map (copy-hash-table (state-map interpreter))
+    :stored-actions (stored-actions interpreter)
+    :stored-continuations (stored-continuations interpreter)
+    :onlinep (onlinep interpreter)))
 
 (defmethod (setf interpreter-memento)
     ((memento basic-interpreter-memento) (interpreter basic-interpreter))
-  (setf (stored-actions interpreter)       (stored-actions memento)
+  (setf (state-map interpreter)            (state-map memento)
+        (stored-actions interpreter)       (stored-actions memento)
         (stored-continuations interpreter) (stored-continuations memento)
         (onlinep interpreter)              (onlinep memento)))
 
-
-(defvar *print-snark-timeouts* t)
-(defvar *print-snark-undecidables* t)
 (defvar *print-snark-refutations* t)
+(defvar *print-snark-undecidables* t)
+(defvar *print-snark-timeouts* t)
 
 (defmethod prove ((interpreter basic-interpreter) (proof-term term)
-                  &key (solution-depth 0))
+                  &key (solution-depth 0)
+                       (quantification-function 'universally-quantify))
   ;; TODO: Handle substitutions for the bound variables, and introduce
   ;; standard bound variable NOW for the current situation.
-  (let* ((free-variables (free-variables proof-term))
-         (free-variable-sexprs (mapcar 'to-sexpr free-variables)))
-    (multiple-value-bind (result reason answer)
-        (prove-using-snark proof-term
-                           :answer `(answer ,@free-variable-sexprs)
-                           :context (context interpreter)
-                           :solution-depth solution-depth)
-      (when *trace-odysseus*
-        (cond ((and (eql reason :refutation-found) *print-snark-refutations*)
-               (format t "~&Refutation found for:~28T~:W~%" (to-sexpr proof-term)))
-              ((and (eql reason :undecidable) *print-snark-undecidables*)
-               (format t "~&Cannot decide:~28T~:W~%" (to-sexpr proof-term)))
-              ((and (eql reason :timeout) *print-snark-timeouts*)
-               (format t "~&Timeout while proving:~28T~:W~%" (to-sexpr proof-term)))))
-      (values result reason free-variables answer))))
+  (multiple-value-bind (closed-term bound-variables)
+      (funcall quantification-function
+               proof-term (context interpreter) :global nil)
+    (let ((free-variables (free-variables proof-term))
+          (bound-variable-sexprs (mapcar 'to-sexpr bound-variables)))
+      (multiple-value-bind (result reason answer)
+          (prove-using-snark (to-sexpr closed-term :include-global nil)
+                             :answer-vars bound-variable-sexprs
+                             :context (context interpreter)
+                             :solution-depth solution-depth)
+        (when *trace-odysseus*
+          (cond ((and (eql reason :refutation-found) *print-snark-refutations*)
+                 (format t "~&Refutation found for:~28T~:W~%" (to-sexpr proof-term)))
+                ((and (eql reason :undecidable) *print-snark-undecidables*)
+                 (format t "~&Cannot decide:~28T~:W~%" (to-sexpr proof-term)))
+                ((and (eql reason :timeout) *print-snark-timeouts*)
+                 (format t "~&Timeout while proving:~28T~:W~%" (to-sexpr proof-term)))))
+        (values result reason free-variables answer)))))
 
 
 (defmethod can-execute-p
@@ -329,7 +337,9 @@ raises an error otherwise.")
                              :operator 'poss
                              :arguments (list term situation)
                              :context (context interpreter))))
-          (prove interpreter proof-term :solution-depth solution-depth)))))
+          (prove interpreter proof-term
+                 :solution-depth solution-depth
+                 :quantification-function 'existentially-quantify)))))
 
 (defmethod execute-stored-actions ((interpreter basic-interpreter))
   (let ((actions (nreverse (stored-actions interpreter)))
@@ -356,8 +366,13 @@ raises an error otherwise.")
     ;; (push cp (choice-points interpreter))
     cp))
 
+(defvar *trace-choice-point-creation* nil)
+
 (defmethod add-choice-point
     ((interpreter basic-interpreter) term situation)
+  (when (and *trace-odysseus* *trace-choice-point-creation*)
+    (format t "~&Creating choice point for~28T~:W~%    Situation:~28T~:W~%"
+            term situation))
   (let ((cp (make-choice-point interpreter term situation)))
     (setf (choice-points interpreter)
           (append (choice-points interpreter) (list cp)))))
@@ -389,7 +404,7 @@ raises an error otherwise.")
                new-state))
         (t
          (cerror "Try setting the state anyway."
-                 "Cannot set situation ~A in interpreter ~A."
+                 "Cannot set state for situation ~A in interpreter ~A."
                  situation interpreter)
          (setf (gethash situation (state-map interpreter))
                new-state))))
@@ -439,6 +454,8 @@ returned as first argument."))
 
 (defun perform-substitutions-in-interpreter
     (interpreter term situation free-variables answer)
+  "Substitutes the values for FREE-VARIABLES bound in ANSWER into TERM,
+SITUATION and the stored actions and continuation of INTERPRETER."
   (let* ((local-context (make-instance 'local-context
                           :enclosing-context (context interpreter)))
          (new-terms
@@ -459,19 +476,63 @@ returned as first argument."))
         (setf situation (substitute-terms new-terms free-variables situation))))
     (values term situation)))
 
+
+(defun proof-and-substitution-found
+    (reason answer &key (ignore-variable-only-answers t))
+  "Returns true if REASON indicates that a proof was found.  If
+IGNORE-VARIABLE-ONLY-ANSWERS is true, then returns true only if a proof was
+found and ANSWER contain at least one non-variable value."
+  (when (and (eql reason :proof-found)
+           (consp answer)
+           (rest answer))
+    (if ignore-variable-only-answers
+        (not (every (lambda (elt)
+                      (typep elt 'snark::variable))
+                    (rest answer)))
+        t)))
+
+(defgeneric maybe-add-choice-point (interpreter term situation reason answer)
+  (:documentation
+   "Adds a choice point, if this may lead to further results.")
+  
+  (:method ((interpreter basic-interpreter) term situation reason answer)
+    "The default method adds choice points only if a proof was found that
+contains substitutions that do not only consist of variables."
+    (if (not (onlinep interpreter))
+        (cond ((proof-and-substitution-found reason answer)
+               (add-choice-point
+                interpreter
+                (clone-multi-solution-term-increasing-depth term)
+                situation)
+               :proof-and-substitution-found)
+              (t
+               :proof-but-no-substitution-found))
+        :offline))
+
+  (:method ((interpreter basic-interpreter) (term primitive-action-term)
+                    situation reason answer)
+    (declare (ignore situation reason answer))
+    (cond ((action-precondition term)
+           (call-next-method))
+          (t
+           :no-action-precondition))))
+
+;;; TODO: When continuing execution after an undecidable test, we have to
+;;; store the test and try to prove it again before committing to a result.
+;;; (Variables may become instantiated by subsequent preconditions or tests,
+;;; thus an undecidable test may become decidable later on.)
+
+(defvar *continue-after-undecidable-test* t
+  "If true, continue interpretation after undecidable tests without failing.")
+
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term test-term) situation)
   (multiple-value-bind (holds? reason free-variables answer)
-      (prove interpreter
-             (argument term)
-             :solution-depth (solution-depth term))
+      (prove interpreter (argument term)
+             :solution-depth (solution-depth term)
+             :quantification-function 'existentially-quantify)
+    (maybe-add-choice-point interpreter term situation reason answer)
     (cond (holds?
-           (when (and (not (onlinep interpreter))
-                      answer
-                      (< (solution-depth term) (max-solution-depth term)))
-             (add-choice-point interpreter
-                               (clone-multi-solution-term-increasing-depth term)
-                               situation))
            (multiple-value-setq (term situation)
              (perform-substitutions-in-interpreter
               interpreter term situation free-variables answer))
@@ -480,43 +541,73 @@ returned as first argument."))
            (values (the-no-operation-term interpreter)
                    (the-empty-program-term interpreter)
                    situation))
+          ((and (eql reason :undecidable) *continue-after-undecidable-test*)
+           (cond (*continue-after-undecidable-test*
+                  (multiple-value-setq (term situation)
+                    (perform-substitutions-in-interpreter
+                     interpreter term situation free-variables answer))
+                  (maybe-output-execution-trace-information
+                   ">>> Continuing after:"
+                   term (list reason :continue) free-variables answer)
+                  (values (the-no-operation-term interpreter)
+                          (the-empty-program-term interpreter)
+                   situation))
+                 (t
+                  (maybe-output-execution-trace-information
+                   ">>> Failing after:"
+                   term (list reason :fail) free-variables answer)
+                  (backtrack interpreter))))
           (t
+           (maybe-add-choice-point interpreter term situation reason answer)
            (maybe-output-execution-trace-information
             ">>> Failed test:" term reason free-variables answer)
            (backtrack interpreter)))))
+
+(defvar *continue-after-undecidable-precondition* nil
+  "If true, continue interpretation (without failing) after actions with
+  undecidable preconditions.")
+
+(defun interpret-1-primitive-action-success
+    (interpreter term situation reason free-variables answer)
+  "Perform the main work of INTERPRET-1 when TERM should be evaluated, either
+because its precondition is true, or because its precondition is undecidable
+and we continue anyway."
+  (multiple-value-setq (term situation)
+    (perform-substitutions-in-interpreter
+     interpreter term situation free-variables answer))
+  (cond ((onlinep interpreter)
+         (maybe-output-execution-trace-information
+          ">>> Executing" term reason free-variables answer)
+         (values term
+                 (the-empty-program-term interpreter)
+                 (make-instance 'successor-situation
+                   :action term
+                   :previous-situation situation)))
+        (t
+         (maybe-output-execution-trace-information
+          "Storing:" term reason free-variables answer)
+         (push term (stored-actions interpreter))
+         (values (the-no-operation-term interpreter)
+                 (the-empty-program-term interpreter)
+                 (make-instance 'successor-situation
+                   :action term
+                   :previous-situation situation)))))
+
 
 (defmethod interpret-1
     ((interpreter basic-interpreter) (term primitive-action-term) situation)
   (multiple-value-bind (can-execute-p reason free-variables answer)
       (can-execute-p interpreter term situation
                      :solution-depth (solution-depth term))
+    (maybe-add-choice-point interpreter term situation reason answer)
     (cond (can-execute-p
-           (when (and (not (onlinep interpreter))
-                      answer
-                      (< (solution-depth term) (max-solution-depth term)))
-             (add-choice-point interpreter
-                               (clone-multi-solution-term-increasing-depth term)
-                               situation))
-           (multiple-value-setq (term situation)
-             (perform-substitutions-in-interpreter
-              interpreter term situation free-variables answer))
-           (cond ((onlinep interpreter)
-                  (maybe-output-execution-trace-information
-                   ">>> Executing" term reason free-variables answer)
-                  (values term
-                          (the-empty-program-term interpreter)
-                          (make-instance 'successor-situation
-                            :action term
-                            :previous-situation situation)))
-                 (t
-                  (maybe-output-execution-trace-information
-                   "Storing:" term reason free-variables answer)
-                  (push term (stored-actions interpreter))
-                  (values (the-no-operation-term interpreter)
-                          (the-empty-program-term interpreter)
-                          (make-instance 'successor-situation
-                            :action term
-                            :previous-situation situation)))))
+           (interpret-1-primitive-action-success
+            interpreter term situation reason free-variables answer))
+          ((and (eql reason :undecidable) *continue-after-undecidable-precondition*)
+           (when *trace-odysseus*
+             (format t "~&Continuing after undecidable precondition!~%"))
+           (interpret-1-primitive-action-success
+            interpreter term situation reason free-variables answer))
           (t
            (maybe-output-execution-trace-information
             "NOT Executing:" term reason free-variables answer)
@@ -577,14 +668,12 @@ returned as first argument."))
     ((interpreter basic-interpreter) (term action-choice-term) situation)
   (if (onlinep interpreter)
       (interpret-1 interpreter (random-elt (body term)) situation)
-      (let ((choice-points
-              (mapcar (lambda (choice)
-                        (make-choice-point interpreter choice situation))
-                      (if *permute-offline-choice*
-                          (shuffle (body term))
-                          (reverse (body term))))))
-        (setf (choice-points interpreter)
-              (append (choice-points interpreter) choice-points))
+      (progn
+        (mapcar (lambda (choice)
+                  (add-choice-point interpreter choice situation))
+                (if *permute-offline-choice*
+                    (shuffle (body term))
+                    (body term)))
         (backtrack interpreter "Starting action choice"))))
 
 (defmethod interpret-1
@@ -628,6 +717,9 @@ returned as first argument."))
 (defun (setf default-interpreter) (new-interpreter)
   "Sets the default interpreter."
   (setf *default-interpreter* new-interpreter))
+
+(defun default-context ()
+  (context (default-interpreter)))
 
 ;;; Multi-Step Interpretation
 ;;; =========================

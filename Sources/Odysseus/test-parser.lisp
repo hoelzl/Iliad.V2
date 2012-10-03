@@ -377,7 +377,7 @@
          (term (parse-into-term-representation '(declare-sort 'situation) cc)))
     (5am:is-true (typep term 'sort-declaration-term))
     (5am:is (eql 'situation (name term)))
-    (5am:is (eql 'situation (declared-sort term)))))
+    (5am:is (eql 'situation (declared-sort term cc)))))
 
 (5am:test (test-parse-into-term-representation-19
            :compile-at :definition-time)
@@ -386,7 +386,7 @@
                 '(declare-subsort 'work-action 'action) cc)))
     (5am:is-true (typep term 'sort-declaration-term))
     (5am:is (eql 'work-action (name term)))
-    (5am:is (eql 'work-action (declared-sort term)))
+    (5am:is (eql 'work-action (declared-sort term cc)))
     (5am:is (eql 'action (supersort term)))))
 
 (5am:test (test-parse-into-term-representation-20
@@ -404,7 +404,7 @@
                 '(declare-constant 's0 :sort 'situation) cc)))
     (5am:is-true (typep term 'constant-declaration-term))
     (5am:is (eql 's0 (name term)))
-    (5am:is (eql 'situation (declared-sort term)))))
+    (5am:is (eql 'situation (declared-sort term cc)))))
 
 (5am:test (test-parse-into-term-representation-22
            :compile-at :definition-time)
@@ -416,7 +416,7 @@
                 cc)))
     (5am:is-true (typep term 'function-declaration-term))
     (5am:is (eql 'do (name term)))
-    (5am:is (equalp '(situation action situation) (declared-sort term)))))
+    (5am:is (equalp '(situation action situation) (declared-sort term cc)))))
 
 (5am:test (test-parse-into-term-representation-23
            :compile-at :definition-time)
@@ -427,7 +427,7 @@
                 cc)))
     (5am:is-true (typep term 'relation-declaration-term))
     (5am:is (eql 'is-rested-p (name term)))
-    (5am:is (equalp '(person situation) (declared-sort term)))))
+    (5am:is (equalp '(person situation) (declared-sort term cc)))))
 
 (5am:test (test-parse-into-term-representation-24
            :compile-at :definition-time)

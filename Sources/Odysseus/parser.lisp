@@ -10,10 +10,13 @@
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 (5am:in-suite odysseus-parser-suite)
 
-(defun starts-with-question-mark-p (symbol)
-  "Returns true if SYMBOL is a symbol of length > 1 that starts with a
-question mark."
-  (let ((name (symbol-name symbol)))
+(defgeneric starts-with-question-mark-p (name)
+  (:documentation
+   "Returns true if NAME is a string or symbol of length > 1 that starts with
+   a question mark.")
+  (:method ((name symbol))
+    (starts-with-question-mark-p (symbol-name name)))
+  (:method ((name string))
     (and (> (length name) 1)
 	 (eql (char name 0) #\?))))
 
@@ -45,26 +48,40 @@ question mark."
                            :expected-class 'primitive-action-definition
                            :current-class class)
                    (define-primitive-action (name declaration)
-                       (declared-sort declaration)
+                       (declared-sort declaration context)
                      :precondition (precondition declaration)))
                   ;; TODO: Handle case of signature changes.
                   (t
                    (define-primitive-action (name declaration)
                        (declared-sort declaration)
                      :precondition (precondition declaration))))))))
+  (:method ((declaration arity-declaration-term) context)
+    (declare-operator-sort (name declaration)
+                           (declared-sort declaration context)
+                           context))
+
   (:method ((declaration primitive-action-declaration-term) context)
+    (declare-operator-sort (name declaration)
+                           (declared-sort declaration context)
+                           context)
     (apply #'define-primitive-action (name declaration)
            (signature declaration)
            (keywords declaration))
     (declare-primitive-action (name declaration) context))
 
   (:method ((declaration functional-fluent-declaration-term) context)
+    (declare-operator-sort (name declaration)
+                           (declared-sort declaration context)
+                           context)
     (apply #'define-functional-fluent (name declaration)
            (signature declaration)
            (keywords declaration))
     (declare-functional-fluent (name declaration) context))
 
   (:method ((declaration relational-fluent-declaration-term) context)
+    (declare-operator-sort (name declaration)
+                           (declared-sort declaration context)
+                           context)
     (apply #'define-relational-fluent (name declaration)
            (signature declaration)
            (keywords declaration))
@@ -182,18 +199,6 @@ arguments are passed, otherwise the name of TERM will not be set."
         (parse-into-term-representation (unquote (first arguments)) context))
   (setf (keywords term) (mapcar 'unquote (rest arguments))))
 
-(defun destructure-variable-name (symbol)
-  (let* ((name (symbol-name symbol))
-         (package (symbol-package symbol)) ;; TODO: What should the package be?
-         (start-index (if (eql (aref name 0) #\?) 1 0))
-         (dot-index (position #\. name))
-         (real-name (intern (subseq name start-index dot-index) package))
-         (sort-name (if (and dot-index (< dot-index (1- (length name))))
-                        (intern (subseq name (1+ dot-index)) package)
-                        t)))
-    (values real-name sort-name)))
-
-
 (defgeneric parse-variable-term (exp compilation-context)
   (:documentation
    "Parse EXP as a VARIABLE-TERM.")
@@ -204,16 +209,18 @@ arguments are passed, otherwise the name of TERM will not be set."
       (make-variable-term name sort context)))
 
   (:method ((exp cons) (context compilation-context))
-    (destructuring-bind (name &key sort &allow-other-keys) exp
+    (destructuring-bind (name &key sort global &allow-other-keys) exp
       (let ((var (parse-variable-term name context)))
+        (when global
+          (setf (global var) global))
         (when sort
-          (if (and (declared-sort var)
-                   (not (eql (declared-sort var) t))
-                   (not (eql (declared-sort var) sort)))
+          (if (and (declared-sort var context)
+                   (not (eql (declared-sort var context) t))
+                   (not (eql (declared-sort var context) sort)))
               (cerror "Ignore the explicit sort declaration."
                       'incompatible-sort-declarations
-                      :thing exp (declared-sort var) sort)
-              (setf (declared-sort var) sort)))
+                      :thing exp (declared-sort var context) sort)
+              (setf (declared-sort var context) sort)))
         var)))
 
   (:method ((exp variable-term) (context compilation-context))
@@ -292,5 +299,5 @@ Otherwise return an instance of UNKNOWN-GENERAL-APPLICATION-TERM."
                      (t
                       (make-instance 'unknown-general-application-term
                                      :operator operator :context context :source exp)))))
-    (parse-arguments-for-term term (rest exp) (or (context term) context))
+    (parse-arguments-for-term term (rest exp) (context term))
     term))

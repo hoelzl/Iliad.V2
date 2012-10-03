@@ -36,7 +36,12 @@
       #:odysseus-parser-suite
       #:odysseus-interpreter-suite
       #:odysseus-compiler-suite
-      #:odysseus-builtins-suite))
+      #:odysseus-builtins-suite
+
+      ;; Double exports (from syntax) for Snark
+      #:to-sexpr
+      #:negate #:universally-quantify #:existentially-quantify
+      #:set-up-snark))
   
   (defvar *odysseus-context-exports*
     '(;; Forward declaration
@@ -57,6 +62,7 @@
       
       #:compilation-context
       #:declarations
+      #:declared-operator-sorts #:declare-operator-sort
       #:unique-terms #:add-unique-term
       #:lookup-functor #:lookup-variable #:lookup-number
       #:known-operators #:default-known-operators
@@ -67,17 +73,12 @@
       #:singleton-terms-mixin
       #:unique-terms-mixin
       #:compilation-unit
-      #:local-context #:enclosing-context #:local-variables
-      
-      #:set-up-snark
-      #:process-declaration-for-snark
-      #:variables-and-term-for-universal-quantification
-      #:make-unique-names-axiom
-      #:make-unique-names-axioms))
+      #:local-context #:enclosing-context #:local-variables))
   
   (defvar *odysseus-term-exports*
     '(#:term #:source
       #:variable-term #:unique-name #:variable-sort #:is-bound-p
+      #:make-unique-variable-name
       #:make-variable-term 
       #:make-anonymous-variable-term 
       #:atomic-term
@@ -106,7 +107,12 @@
       #:quantification-term
       #:universal-quantification-term
       #:existential-quantification-term
-      
+
+      #:*default-max-solution-depth*
+      #:multi-solution-mixin
+      #:soulution-depth #:max-solution-depth
+      #:clone-multi-solution-term-increasing-depth
+
       #:empty-program-term
       #:is-final-term-p
       #:primitive-action-term
@@ -161,7 +167,17 @@
       #:to-sexpr
       #:free-variables #:free-variable-sexprs
       #:contains-variable-p
-      #:substitute-term #:substitute-terms))
+      #:substitute-term #:substitute-terms
+      #:negate #:universally-quantify
+      
+      #:variables-and-term-for-universal-quantification
+      #:make-unique-names-axiom
+      #:make-unique-names-axiom-for-arguments
+      #:make-unique-names-axioms
+
+      #:invalid-declaration-type
+      #:process-declaration-for-snark
+      #:set-up-snark))
   
   (defvar *odysseus-operator-exports*
     '("&" "," ";" "~" "->" "=>" "<-" "<=" "<->" "<=>"
@@ -275,7 +291,11 @@
       #:printing-interpreter
 
       #:default-interpreter
+      #:default-context
 
+      #:*continue-after-undecidable-test*
+      #:*continue-after-undecidable-precondition*
+      #:maybe-add-choice-point
       #:interpret-1
       #:skip-noops #:print-everything
       #:interpret
