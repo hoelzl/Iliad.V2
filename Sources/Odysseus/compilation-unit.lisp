@@ -82,6 +82,10 @@
     :accessor declarations :initarg :declarations
     :initform (make-array '(10) :adjustable t :fill-pointer 0)
     :documentation "Logical declarations for this compilation unit.")
+   (declared-operator-sorts
+    :accessor declared-operator-sorts :initarg :declared-operator-sorts
+    :initform (make-hash-table)
+    :documentation "Hash table mapping operators to their declared sorts.")
    (known-operators
     :accessor known-operators :initarg :known-operators
     :initform (default-known-operators)
@@ -105,7 +109,11 @@
    (functor-hash-table
     :accessor functor-hash-table :initarg :functor-hash-table
     :initform (make-hash-table)
-    :documentation "Hash table for interning functors"))
+    :documentation "Hash table for interning functors")
+   (constants-for-sort-table
+    :accessor constants-for-sort-table :initarg :constants-for-sort-table
+    :initform (make-hash-table)
+    :documentation "Hash table mapping sorts to their constants."))
   (:documentation
    "A single compilation unit."))
 
@@ -219,8 +227,14 @@
 (defmethod declarations ((context local-context))
   (declarations (enclosing-context context)))
 
-(defmethod (setf declarations) (new-declaratiions (context local-context))
-  (setf (declarations (enclosing-context context)) new-declaratiions))
+(defmethod (setf declarations) (new-declarations (context local-context))
+  (setf (declarations (enclosing-context context)) new-declarations))
+
+(defmethod declared-operator-sorts ((context local-context))
+  (declared-operator-sorts (enclosing-context context)))
+
+(defmethod (setf declared-operator-sorts) (new-declarations (context local-context))
+  (setf (declared-operator-sorts (enclosing-context context)) new-declarations))
 
 (defmethod known-operators ((context local-context))
   (known-operators (enclosing-context context)))

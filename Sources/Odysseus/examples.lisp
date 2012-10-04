@@ -16,6 +16,9 @@
     (declare-sort 'object)
     (declare-sorts-incompatible 'situation 'action 'object)
   
+    ;; Precondition
+    (declare-relation 'poss 2 :sort '(action situation))
+    
     ;; Situations
     (declare-unique-constant 's0 :sort 'situation)
     (declare-unique-function 'do 2
@@ -29,6 +32,8 @@
     (declare-unique-constant 'laith :sort 'person)
     (declare-unique-constant 'lenz :sort 'person)
     (declare-unique-constant 'matthias :sort 'person)
+
+    (declare-ordering-greaterp  'matthias 'lenz 'laith 'annabelle)
     
     ;; Fluents
     (declare-relational-fluent 'is-rested-p '(person situation))
@@ -58,8 +63,8 @@
                 (= a (sleep p))
                 (and (is-rested-p p s)
                  (not (= a (work p)))))))
-                 :rewrite-too t :supported nil :sequential t)
-
+            :rewrite-too t :supported t :sequential t)
+    
     ;; Axiom for IS-PARENT-P
     (assert '(forall ((p :sort person)
                       (a :sort action)
@@ -112,6 +117,9 @@
 
 (defexample interpret-01d (:set-up-function 'set-up-ewsc-theory)
   (celebrate matthias))
+
+(defexample interpret-01e (:set-up-function 'set-up-ewsc-theory)
+  (celebrate ?p.person))
 
 (defexample interpret-02 (:set-up-function 'set-up-ewsc-theory)
   (seq
@@ -192,6 +200,42 @@
    (work ?p.person)
    (eat ?p.person)
    (celebrate ?p.person)))
+
+(defexample interpret-09a.1 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (eat ?p.person)
+   (work ?p.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-09a.2 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (work ?p.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-09a.3 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (celebrate ?p.person)))
+
+(defexample interpret-09a.4 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (work annabelle)
+   (celebrate ?p.person)))
+
+(defexample interpret-09a.5 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (work ?p1.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-09a.6 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (work annabelle)
+   (celebrate annabelle)))
 
 (defexample interpret-09b (:set-up-function 'set-up-ewsc-theory)
   (search
@@ -321,13 +365,6 @@
    (eat ?p.person)
    (eat ?p.person)
    (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
-   (eat ?p.person)
    (celebrate ?p.person)))
 
 (defexample interpret-09i (:set-up-function 'set-up-ewsc-theory
@@ -348,6 +385,54 @@
    (eat ?p.person)
    (eat ?p.person)
    (celebrate ?p.person)))
+
+
+(defparameter *test-results* (make-array 0 :adjustable t :fill-pointer 0))
+;;; Example 09j produces strange results.  Some code to investigate.
+#+ccl
+(defun run-09j-1 ()
+  (let ((*print-snark-output* t)
+        (*standard-output* (make-string-output-stream))
+        ;; (osnark::*run-time-limit* 10)
+        ;; (osnark::*ida-run-time-limit* 5)
+        ;; (osnark::*ida-iterations* 5)
+        )
+    (setf od::*unique-variable-counter* 0)
+    (setf *random-state*
+          #.(ccl::initialize-mrg31k3p-state 1198457932 1380137222
+                                            1638487109 1665184398
+                                            1265987524 1241468170))
+    (run-example 'interpret-09j)
+    (vector-push-extend (get-output-stream-string *standard-output*)
+                        *test-results*))
+  (snark:answer t))
+
+(defun run-09j-2 ()
+  (let ((od::*unique-variable-counter* 0)
+        (*random-state*
+          #+CCL
+          #.(ccl::initialize-mrg31k3p-state 2050483999 1800982157
+                                            1285892873 1931966779
+                                            662038711 1757111211)
+          #-CCL (make-random-state))
+        (*permute-offline-choice* nil))
+    (run-example 'interpret-09j)))
+
+
+(defun print-test-result (&optional (index 0))
+  (print (aref *test-results* index)))
+
+(defun write-test-result (&optional (index 0) (file "/Users/tc/Temp/poem-output.text"))
+  (with-output-to-file (stream file :if-exists :supersede)
+    (format stream "~A" (aref *test-results* index))))
+
+(defun compare-test-results (index)
+  (let ((s1 (make-array 0 :adjustable t :fill-pointer 0))
+        (s2 (make-array 0 :adjustable t :fill-pointer 0)))
+    (read-sequence s1 (aref *test-results* index))
+    (read-sequence s2 (aref *test-results* (1+ index)))
+    (equalp s1 s2)))
+
 
 (defexample interpret-09j (:set-up-function 'set-up-ewsc-theory
                            :hidden? t)

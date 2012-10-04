@@ -10,23 +10,6 @@
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 (5am:in-suite odysseus-syntax-suite)
 
-;;; Names
-;;; =====
-
-(defclass name-mixin ()
-  ((name
-    :accessor name :initarg :name :initform :<unnamed> :type symbol
-    :documentation "The name of the entity that inherits this mixin."))
-  (:documentation
-   "Mixin inherited by all classes that have names."))
-
-(defclass required-name-mixin (name-mixin)
-  ((name
-    :initform (required-argument :name)
-    :documentation "The name of the entity that inherits this mixin."))
-  (:documentation
-   "Mixin inherited by all classes that require a name."))
-
 ;;; Local Context Mixin
 ;;; ===================
 
@@ -53,11 +36,21 @@
    "Mixin that provides a KEYWORDS slot."))
 
 
-(defgeneric declared-sort (term)
+(defgeneric declared-sort (term context)
   (:documentation
    "Returns the sort of TERM, or NIL if no sort for TERM is known.")
-  (:method ((term keywords-mixin))
+  (:method (term context)
+    (declare (ignore context))
+    (cerror "Return an empty list."
+            "No declared sort for ~:W." term)
+    '())
+  (:method ((term keywords-mixin) context)
+    (declare (ignore context))
     (getf (keywords term) :sort)))
+
+(defgeneric (setf declared-sort) (sort term context)
+  (:documentation
+   "Sets the declared sort of TERM in CONTEXT to SORT."))
 
 (defgeneric successor-state (term)
   (:documentation
@@ -125,15 +118,19 @@
 
 (defclass variable-term (term name-mixin source-mixin)
   ((unique-name
-    :initform nil :initarg :unique-name
+    :accessor unique-name :initarg :unique-name
     :documentation "A unique name for code generation.")
    (declared-sort
-    :accessor declared-sort :initarg :sort :initform t
+    :initarg :sort :initform t
     :documentation
     "The declared sort of the variable or T if no sort was declared.")
    (is-bound-p 
     :accessor is-bound-p :initarg :is-bound-p :initform nil
-    :documentation "True if the variable is bound."))
+    :documentation "True if the variable is bound.")
+   (global
+    :accessor global :initarg :global :initform nil
+    :documentation "True if the variable is globally accessible, i.e., if
+    answer terms can access this variable."))
   (:documentation
    "Representation of variables."))
 
@@ -142,37 +139,63 @@
 (defgeneric unique-name (term)
   (:documentation 
    "Return a unique name for TERM or raise an error if it has no unique name.")
-
   (:method (term)
-    (error "Term ~A has no unique name." term))
+    (error "Term ~A has no unique name." term)))
 
-  (:method ((term variable-term))
-    (or (slot-value term 'unique-name)
-        (setf (slot-value term 'unique-name)
-              (make-symbol (format nil "?~:[VAR~;~:*~A~]~A.~A"
-                                   (name term)
-                                   (incf *unique-variable-counter*)
-                                   (declared-sort term)))))))
+(defun destructure-variable-name (symbol)
+  (let* ((name (symbol-name symbol))
+         (package (or (symbol-package symbol) *package*))
+         (start-index (if (eql (aref name 0) #\?) 1 0))
+         (dot-index (position #\. name))
+         (real-name (intern (subseq name start-index dot-index) package))
+         (sort-name (if (and dot-index (< dot-index (1- (length name))))
+                        (intern (subseq name (1+ dot-index)) package)
+                        t)))
+    (values real-name sort-name)))
+
+(defun make-unique-variable-name (var context)
+  (make-symbol (format nil "?~:[VAR~;~:*~A~]~A.~A"
+                       (destructure-variable-name (name var))
+                       (incf *unique-variable-counter*)
+                       (declared-sort var context))))
+
+(defmethod declared-sort ((var variable-term) (context compilation-context))
+  (declare (ignore context))
+  (slot-value var 'declared-sort))
+
+(defmethod (setf declared-sort)
+    (sort (var variable-term) (context compilation-context))
+  (setf (slot-value var 'declared-sort) sort)
+  (setf (unique-name var) (make-unique-variable-name var context)))
+        
 
 (define-interning-make-instance variable name sort)
 
-(defun make-variable-term (name sort context &key (intern t) (is-bound-p nil))
+(defun make-variable-term (name sort context
+                           &key (intern t) (is-bound-p nil) (global nil))
   (when (stringp name)
     (setf name (intern name)))
   (when (stringp sort)
     (setf sort (intern sort)))
   (assert (typep name 'symbol) (name)
           "~A cannot denote a variable (it is not a symbol)." name)
-  (make-instance 'variable-term
-                 :name name :sort sort :context context :source name
-                 :intern intern :is-bound-p is-bound-p))
+  (let ((var (make-instance 'variable-term
+               :name (destructure-variable-name name)
+               :sort sort :context context
+               :source name
+               :intern intern :is-bound-p is-bound-p
+               :global global)))
+    (setf (unique-name var)
+          (make-unique-variable-name var context))
+    var))
 
-(defun make-anonymous-variable-term (sort context &key (is-bound-p nil))
+(defun make-anonymous-variable-term (sort context &key (is-bound-p nil) (global nil))
   (let* ((name (make-symbol (format nil "?_V~A.~A"
                                     (incf *unique-variable-counter*)
                                     sort)))
          (result (make-variable-term
-                  name sort context :is-bound-p is-bound-p)))
+                  name sort context
+                  :is-bound-p is-bound-p :global global)))
     (setf (slot-value result 'unique-name) name)
     result))
 
@@ -269,6 +292,15 @@ structure."))
 
 (defgeneric (setf arguments) (new-value application-term)
   (:documentation "Set the arguments of APPLICATION-TERM to NEW-VALUE."))
+
+(defmethod declared-sort ((term application-term) context)
+  (or (gethash (operator term) (declared-operator-sorts context))
+      (call-next-method)))
+
+(defmethod (setf declared-sort)
+    (sort (term application-term) (context compilation-context))
+  (declare-operator-sort (operator term) sort context))
+
 
 (defclass arguments-mixin ()
   ((arguments :accessor arguments :initarg :arguments :initform '()
@@ -571,10 +603,18 @@ or :ARG3 init-keywords is also provided."
   (:method ((term empty-program-term))
     t))
 
-(defclass primitive-action-term (known-general-application-term multi-solution-mixin)
+(defclass primitive-action-term
+    (known-general-application-term multi-solution-mixin)
   ()
   (:documentation
    "A term describing the execution of a primitive action."))
+
+(defun precondition-term (term situation)
+  "Create a precondition term for TERM in SITUATION."
+  (make-instance 'unknown-general-application-term
+    :operator 'poss
+    :arguments (list term situation)
+    :context (context term)))
 
 (defmethod clone-multi-solution-term-increasing-depth ((term primitive-action-term))
   (make-instance (class-of term)
@@ -583,6 +623,10 @@ or :ARG3 init-keywords is also provided."
     :max-solution-depth (max-solution-depth term)
     :context (context term)
     :source :generated-term))
+
+(defmethod action-precondition ((term primitive-action-term))
+  (let ((definition (lookup-primitive-action (operator term) (context term))))
+    (action-precondition definition)))
 
 (define-primitive-action 'no-operation '())
 
@@ -778,7 +822,8 @@ or :ARG3 init-keywords is also provided."
 (defmethod operator ((term sort-declaration-term))
   'declare-sort)
 
-(defmethod declared-sort ((term sort-declaration-term))
+(defmethod declared-sort ((term sort-declaration-term) context)
+  (declare (ignore context))
   (name term))
 
 (defclass subsort-declaration-term (sort-declaration-term)
@@ -800,7 +845,8 @@ or :ARG3 init-keywords is also provided."
 (defclass signature-declaration-term (named-declaration-term)
   ((signature :accessor signature :initarg :signature :initform '())))
 
-(defmethod declared-sort ((term signature-declaration-term))
+(defmethod declared-sort ((term signature-declaration-term) context)
+  (declare (ignore context))
   (signature term))
 
 (defclass primitive-action-declaration-term (signature-declaration-term unique-term-mixin)
@@ -844,6 +890,20 @@ or :ARG3 init-keywords is also provided."
 
 (defmethod operator ((term constant-declaration-term))
   'declare-constant)
+
+(defmethod declare-constant-sort ((constant constant-declaration-term) context)
+    (let* ((keys (keywords constant))
+           (sort (getf keys :sort)))
+      (when sort
+        (let* ((sort-table (constants-for-sort-table context))
+               (constants (gethash* sort sort-table  '())))
+          (unless (member constant constants)
+            (setf (gethash sort sort-table) 
+                  (cons (make-instance 'primitive-term 
+                          :value (name constant)
+                          :context context
+                          :source :generated-term)
+                        constants)))))))
 
 (defclass unique-constant-declaration-term (constant-declaration-term unique-term-mixin)
   ()

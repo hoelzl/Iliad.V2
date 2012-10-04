@@ -23,7 +23,7 @@
 (5am:test (test-make-variable :compile-at :definition-time)
   (let ((var (make-variable-term 'foo 'bar nil :intern nil)))
     (5am:is (eql 'foo (name var)))
-    (5am:is (eql 'bar (declared-sort var)))
+    (5am:is (eql 'bar (declared-sort var cc)))
     (5am:is (symbolp (unique-name var)))
     ;; Check that the unique name is in fact interned.
     (5am:is (eql (unique-name var) (unique-name var)))

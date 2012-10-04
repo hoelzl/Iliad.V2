@@ -41,6 +41,21 @@
     (declare (ignore context))
     nil))
 
+(defgeneric constants-for-sort-table (context)
+  (:documentation
+   "Return a table that contains a list of constants for each sort."))
+
+(defgeneric declare-constant-sort (constant context)
+  (:documentation
+   "Declare the sort for CONSTANT in CONTEXT according to its declaration.  If
+   the sort is is NIL then don't add a declaration."))
+
+(defgeneric constants-for-sort (sort context)
+  (:documentation
+   "Return a list of all constants for SORT in CONTEXT.")
+  (:method (sort context)
+    (gethash sort (constants-for-sort-table context) '())))
+
 (defgeneric declarations (context)
   (:documentation
    "Returns an extensible sequence of all logical declarations (sort
@@ -50,6 +65,29 @@ etc. for this context."))
 (defgeneric (setf declarations) (new-declarations context)
   (:documentation
    "Sets the logical declarations for CONTEXT to NEW-DECLARATIONS."))
+
+(defgeneric declared-operator-sorts (context)
+  (:documentation
+   "Returns a hash table mapping operators to their declared sorts in
+   CONTEXT."))
+
+(defgeneric (setf declared-operator-sorts) (new-value context)
+  (:documentation
+   "Sets the hash table mapping operators to their declared sorts in
+   CONTEXT."))
+
+(defvar *warn-for-null-operator-sorts* t)
+
+(defgeneric declare-operator-sort (operator sort context)
+  (:documentation
+   "Declare OPERATOR to have SORT in CONTEXT, i.e., subsequent calls
+   to (GETHASH OPERATOR (DECLARED-OPERATOR-SORTS CONTEXT)) should return
+   true.")
+  (:method (operator sort context)
+    (if sort
+        (setf (gethash operator (declared-operator-sorts context)) sort)
+        (when *warn-for-null-operator-sorts*
+          (warn "No sort declaration for operator ~A." operator)))))
 
 (defgeneric unique-terms (context)
   (:documentation
@@ -126,6 +164,30 @@ etc. for this context."))
 ;;; TODO: See (setf known-operators).
 (defgeneric (setf primitive-actions) (new-value context))
 
+(define-condition no-definition-for-primitive-action
+    (runtime-error)
+  ((name :initarg :name)
+   (context :initarg :context))
+  (:report (lambda (condition stream)
+             (with-slots (name context) condition 
+               (format stream "No primitive action ~A in context ~:W"
+                       name context)))))
+
+;;; TODO: We probably should not have both PRIMITIVE-ACTION-DEFINITION
+;;; and LOOKUP-PRIMITIVE-ACTION.
+(defgeneric lookup-primitive-action (name context &optional default)
+  (:documentation
+   "Look up the definition of the primitive action NAME in CONTEXT.")
+  (:method (name (context compilation-context)
+            &optional (default nil default-supplied-p))
+    (or (primitive-action-definition name context nil)
+        (if default-supplied-p
+            default
+            (cerror "Return NIL."
+                    'no-definition-for-primitive-action
+                    :name name :context context)))))
+
+
 ;;; Operator and Context Mixins
 ;;; ===========================
 
@@ -143,9 +205,8 @@ etc. for this context."))
 (defclass context-mixin ()
   ((context
     :accessor context :initarg :context 
-    ; :initform (required-argument :context)
+    :initform (required-argument :context)
     :documentation "The context to which this object belongs."))
-  (:default-initargs :context (required-argument :context))
   (:documentation "Mixin that provides a CONTEXT slot."))
 
 ;;; Primitive Action Definitions

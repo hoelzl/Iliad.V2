@@ -10,8 +10,11 @@
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 
 (defvar *print-snark-output* nil)
+(defvar *run-time-limit* 0.2)
+(defvar *ida-run-time-limit* (/ *run-time-limit* 2))
+(defvar *ida-iterations* 3)
 
-(defun initialize-snark (&key (run-time-limit 0.1))
+(defun initialize-snark (&key (run-time-limit *run-time-limit*))
   (maybe-suppress-snark-output
     (initialize))
   ;; (agenda-length-limit nil)
@@ -28,49 +31,60 @@
   (use-literal-ordering-with-ur-resolution 'literal-ordering-p)
   (use-literal-ordering-with-paramodulation 'literal-ordering-p)
   (ordering-functions>constants t)
-  (print-options-when-starting nil)
-  (print-summary-when-finished nil)
-  (print-rows-when-derived nil)
-  (print-rows-when-finished nil)
-  (print-agenda-when-finished nil)
+  ;; (print-options-when-starting *print-snark-output*)
+  (print-summary-when-finished *print-snark-output*)
+  ;; (print-rows-when-derived *print-snark-output*)
+  ;; (print-rows-when-finished *print-snark-output*)
+  (print-final-rows *print-snark-output*)
+  (print-row-answers *print-snark-output*)
+  (print-agenda-when-finished *print-snark-output*)
   (run-time-limit run-time-limit)
+  ;; (use-indefinite-answers t)
   ;; (use-conditional-answer-creation t)
-  ;; (use-subsumption-by-false nil)
-  ;; (use-constructive-answer-restriction nil)
-  (allow-skolem-symbols-in-answers t)
+  (use-subsumption-by-false t)
+  (use-constructive-answer-restriction t)
+  (allow-skolem-symbols-in-answers nil)
   )
 
+(defun process-snark-args (args answer-vars)
+  (setf args (alexandria:remove-from-plist
+              args
+              :answer-vars :global :solution-depth :context :run-time-limit))
+  (if answer-vars
+      (list* :answer (cons 'answer answer-vars) args)
+      args))
 
 (defun prove-or-refute (term &rest args
-			&key context (run-time-limit 0.1)
-			&allow-other-keys)
+			&key answer-vars context (run-time-limit *run-time-limit*)
+ 			&allow-other-keys)
+  (check-type term list)
   (assert context (context)
           "Cannot prove or refute without a context.")
   (initialize-snark :run-time-limit run-time-limit)
-  (set-up-snark context)
-  (let* ((new-args (alexandria:remove-from-plist
-                    args
-                    :solution-depth :context :run-time-limit))
-	 (result (maybe-suppress-snark-output
+  (odysseus:set-up-snark context)
+  (let* ((new-args (process-snark-args args answer-vars))
+         (result (maybe-suppress-snark-output
                    (apply 'snark:prove term new-args))))
-    (ecase result
-      (:proof-found result)
-      ((:run-time-limit :agenda-empty)
-       (initialize-snark :run-time-limit run-time-limit)
-       (set-up-snark context)
-       (let ((result (maybe-suppress-snark-output
-                       (apply 'prove `(snark::not ,term) new-args))))
-	 (ecase result
-	   (:proof-found :refutation-found)
-	   (:agenda-empty :agenda-empty)
-	   (:run-time-limit :run-time-limit)))))))
+      (ecase result
+        (:proof-found result)
+        ((:run-time-limit :agenda-empty)
+         (initialize-snark :run-time-limit run-time-limit)
+         (odysseus:set-up-snark context)
+         (let* ((negated-term `(not ,term))
+                (result (maybe-suppress-snark-output
+                          (apply 'prove negated-term new-args))))
+           (ecase result
+             (:proof-found :refutation-found)
+             (:agenda-empty :agenda-empty)
+             (:run-time-limit :run-time-limit)))))))
 
 (defvar *trace-ida-time-increases* nil)
 
 (defun ida-prove-or-refute (term &rest args &key &allow-other-keys)
-  (let* ((initial-run-time-limit 0.05)
+  (check-type term list)
+  (let* ((initial-run-time-limit *ida-run-time-limit*)
 	 (run-time-limit initial-run-time-limit)
-	 (iterations 4))
+	 (iterations *ida-iterations*))
     (alexandria:remove-from-plistf args :run-time-limit)
     (dotimes (i iterations)
       (let ((result (apply 'prove-or-refute term
@@ -85,7 +99,7 @@
     (run-time-limit initial-run-time-limit)
     :run-time-limit))
 
-(defvar *error-when-refutation-without-answer* t)
+(defvar *error-when-refutation-without-answer* nil)
 
 (define-condition refutation-without-answer (runtime-error)
   ()
@@ -119,6 +133,7 @@
     (finally (return (values t :proof-found (snark-answer))))))
 
 (defun prove-using-snark-depth-zero (term args)
+  (check-type term list)
   (when (trace-odysseus-p)
     (format t "~&Trying to prove or refute:~28T~:W~%" term)
     (format t "~&    Solution depth:~28T0~%"))
@@ -133,11 +148,13 @@
       (otherwise
        (values nil :timeout nil)))))
 
-(defun prove-using-snark-closure (term solution-depth answer)
+(defun prove-using-snark-closure (term solution-depth answer-vars)
+  (check-type term list)
   (when (trace-odysseus-p)
     (format t "~&Trying to prove:~28T~:W" term)
     (format t "~&    Solution depth:~28T~A~%" solution-depth))
-  (let ((result (maybe-suppress-snark-output
+  (let* ((answer (cons 'answer answer-vars))
+         (result (maybe-suppress-snark-output
                   (snark:prove term :answer answer))))
     (ecase result
       (:proof-found
@@ -148,22 +165,20 @@
        (values nil :timeout nil)))))
 
 (defgeneric prove-using-snark
-    (term &rest args &key context answer solution-depth)
+    (term &rest args &key context answer-vars solution-depth)
   (:documentation
    "Prove TERM using SNARK.")
 
   (:method ((term odysseus-syntax:term)
             &rest args
-            &key context answer (solution-depth 0))
-    (declare (ignore context answer solution-depth))
-    (apply 'prove-using-snark (odysseus-syntax:to-sexpr term) args))
+            &key context answer-vars (solution-depth 0))
+    (declare (ignore context answer-vars solution-depth))
+    (apply 'prove-using-snark (to-sexpr term :include-global t) args))
 
   (:method ((term cons)
             &rest args
-            &key context answer (solution-depth 0))
+            &key context answer-vars (solution-depth 0))
     (declare (ignore context))
-    (unless answer
-      (alexandria:remove-from-plistf args :answer))
     (if (= solution-depth 0)
         (prove-using-snark-depth-zero term args)
-        (prove-using-snark-closure term solution-depth answer))))
+        (prove-using-snark-closure term solution-depth answer-vars))))
