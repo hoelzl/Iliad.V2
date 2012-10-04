@@ -224,42 +224,20 @@
 (defmethod (setf lookup-functor) (new-value name arity (context local-context))
   (setf (lookup-functor name arity (enclosing-context context)) new-value))
 
-(defmethod declarations ((context local-context))
-  (declarations (enclosing-context context)))
-
-(defmethod (setf declarations) (new-declarations (context local-context))
-  (setf (declarations (enclosing-context context)) new-declarations))
-
-(defmethod declared-operator-sorts ((context local-context))
-  (declared-operator-sorts (enclosing-context context)))
-
-(defmethod (setf declared-operator-sorts) (new-declarations (context local-context))
-  (setf (declared-operator-sorts (enclosing-context context)) new-declarations))
-
-(defmethod known-operators ((context local-context))
-  (known-operators (enclosing-context context)))
-
-(defmethod (setf known-operators) (new-value (context local-context))
-  (setf (known-operators (enclosing-context context)) new-value))
-
-(defmethod primitive-actions ((context local-context))
-  (primitive-actions (enclosing-context context)))
-
-(defmethod (setf primitive-actions) ((new-value list) (context local-context))
-  (setf (primitive-actions (enclosing-context context)) new-value))
-
-(defmethod fluents ((context local-context))
-  (fluents (enclosing-context context)))
-
-(defmethod (setf fluents) (new-value (context local-context))
-  (setf (fluents (enclosing-context context)) new-value))
-
-(defmethod the-empty-program-term ((context local-context))
-  (the-empty-program-term (enclosing-context context)))
-
-(defmethod the-no-operation-term ((context local-context))
-  (the-no-operation-term (enclosing-context context)))
-
+(define-delegates local-context enclosing-context
+  (declarations (context))
+  ((setf declarations) (new-declarations context))
+  (declared-operator-sorts (context))
+  ((setf declared-operator-sorts) (new-value context))
+  (known-operators (context))
+  ((setf known-operator) (new-value context))
+  (primitive-actions (context))
+  ((setf primitive-actions) (new-value context)
+                            :new-value-type list)
+  (fluents (context))
+  ((setf fluents) (new-value context))
+  (the-empty-program-term (context))
+  (the-no-operation-term (context)))
 
 ;;; Some utilities for interactive exploration
 ;;; ==========================================

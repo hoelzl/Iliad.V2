@@ -11,6 +11,36 @@
 #+5am
 (5am:in-suite odysseus-macro-suite)
 
+;;; Defining Delegates
+;;; ==================
+
+(defmacro defdelegate (name arglist from to &key new-value-type)
+  "Delegate generic function NAME with arguments ARGLIST from the first
+argument of type FROM to TO."
+    (if (and (consp name) (eql (first name) 'setf))
+        (let* ((new-value (first arglist))
+               (new-arg (if new-value-type
+                            (list new-value new-value-type)
+                            new-value))
+               (method-arglist `((,(second arglist) ,from) ,@(cddr arglist)))
+               (argument-arglist `((,to ,(second arglist)) ,@(cddr arglist)))
+               (name (second name)))
+          `(defmethod (setf ,name)
+               ,(cons new-arg method-arglist)
+             (setf (,name ,@argument-arglist) ,new-value)))
+        (let ((method-arglist `((,(first arglist) ,from) ,@(rest arglist)))
+              (argument-arglist `((,to ,(first arglist)) ,@(rest arglist))))
+          `(defmethod ,name ,method-arglist
+             (,name ,@argument-arglist)))))
+
+(defmacro define-delegates (from to &rest name-arglist-pairs)
+  `(progn
+     ,@(mapcar (lambda (name-arglist-pair)
+                 (destructuring-bind (name arglist &key new-value-type) name-arglist-pair
+                   `(defdelegate ,name ,arglist ,from ,to
+                      :new-value-type ,new-value-type)))
+               name-arglist-pairs)))
+
 ;;; Interning instances
 ;;; ===================
 
