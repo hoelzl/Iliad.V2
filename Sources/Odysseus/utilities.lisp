@@ -126,6 +126,22 @@
                          :function (compile nil fun)
                          initargs)))))
 
+
+;;; Helper Methods for Macro Definitions
+;;; ====================================
+
+(defun uncons (thing)
+  (if (consp thing)
+      (first thing)
+      thing))
+
+(defun process-argument-arglist (arglist)
+  (multiple-value-bind (required optional rest keys)
+      (parse-ordinary-lambda-list arglist :allow-specializers t)
+    (assert (not rest) ()
+            "Cannot currently handle arglists with &REST parameter.")
+    `(,@(mapcar 'uncons required) ,@(mapcar 'first optional) ,@(mapcan 'first keys))))
+
 ;;; Three-Valued Logic
 ;;; ==================
 

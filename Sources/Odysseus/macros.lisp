@@ -23,13 +23,15 @@ argument of type FROM to TO."
                             (list new-value new-value-type)
                             new-value))
                (method-arglist `((,(second arglist) ,from) ,@(cddr arglist)))
-               (argument-arglist `((,to ,(second arglist)) ,@(cddr arglist)))
+               (argument-arglist `((,to ,(second arglist))
+                                   ,@(process-argument-arglist (cddr arglist))))
                (name (second name)))
           `(defmethod (setf ,name)
                ,(cons new-arg method-arglist)
              (setf (,name ,@argument-arglist) ,new-value)))
         (let ((method-arglist `((,(first arglist) ,from) ,@(rest arglist)))
-              (argument-arglist `((,to ,(first arglist)) ,@(rest arglist))))
+              (argument-arglist `((,to ,(first arglist))
+                                  ,@(process-argument-arglist (rest arglist)))))
           `(defmethod ,name ,method-arglist
              (,name ,@argument-arglist)))))
 

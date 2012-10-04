@@ -27,6 +27,8 @@
       #:boolean3
       #:and3 #:or3 #:not3
       ;; Macros
+      #:process-argument-arglist
+      #:defdelegate #:define-delegates
       #:define-interning-make-instance
       #:maybe-suppress-snark-output
       ;; Support for testing
