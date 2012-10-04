@@ -109,7 +109,11 @@
    (functor-hash-table
     :accessor functor-hash-table :initarg :functor-hash-table
     :initform (make-hash-table)
-    :documentation "Hash table for interning functors"))
+    :documentation "Hash table for interning functors")
+   (constants-for-sort-table
+    :accessor constants-for-sort-table :initarg :constants-for-sort-table
+    :initform (make-hash-table)
+    :documentation "Hash table mapping sorts to their constants."))
   (:documentation
    "A single compilation unit."))
 

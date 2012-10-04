@@ -9,6 +9,23 @@
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 
+;;; Names
+;;; =====
+
+(defclass name-mixin ()
+  ((name
+    :accessor name :initarg :name :initform :<unnamed> :type symbol
+    :documentation "The name of the entity that inherits this mixin."))
+  (:documentation
+   "Mixin inherited by all classes that have names."))
+
+(defclass required-name-mixin (name-mixin)
+  ((name
+    :initform (required-argument :name)
+    :documentation "The name of the entity that inherits this mixin."))
+  (:documentation
+   "Mixin inherited by all classes that require a name."))
+
 ;;; Errors
 ;;; ======
 

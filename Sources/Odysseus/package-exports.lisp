@@ -9,7 +9,9 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *odysseus-utilities-exports*
-    '(;; Errors
+    '(;; Names
+      #:name-mixin #:required-name-mixin #:name
+      ;; Errors
       #:runtime-error
       #:invalid-class
       ;; Tracing
@@ -56,7 +58,6 @@
       #:declare-relational-fluent #:define-relational-fluent
       #:functional-fluent-definition
       #:declare-functional-fluent #:define-functional-fluent
-      #:name-mixin #:required-name-mixin #:name
       #:arguments-mixin #:arguments
       #:known-term #:is-known-term-p
       
@@ -116,6 +117,7 @@
       #:empty-program-term
       #:is-final-term-p
       #:primitive-action-term
+      #:precondition-term
       #:no-operation-term #:no-operation
       #:test-term
       #:solution-depth #:max-solution-depth
@@ -266,6 +268,8 @@
       #:backtrack
       #:stored-actions
       #:execute-stored-actions #:execute-primitive-action
+      #:stored-continuations
+      #:deferred-proofs
       #:state-map #:can-set-state-p #:state
       #:maybe-output-trace-information
       #:perform-substitutions-in-interpreter

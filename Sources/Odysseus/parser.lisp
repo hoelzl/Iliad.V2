@@ -35,6 +35,9 @@
   (:method :after ((term unique-term-mixin) context)
     (add-unique-term term context))
 
+  (:method ((term constant-declaration-term) context)
+    (declare-constant-sort term context))
+
   ;; TODO: We might want to do something along the following lines.  For now
   ;; we use a simple implementation that always calls DEFINE-PRIMITIVE-ACTION.
   #+(or)

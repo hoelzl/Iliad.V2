@@ -282,8 +282,8 @@
              (substitute-terms (rest new-terms) (rest old-terms) new-term))))))
 
 
-;;; Universally Quantifying a Term
-;;; ==============================
+;;; Operations on Terms
+;;; ===================
 
 (defgeneric negate (term context)
   (:documentation
@@ -302,6 +302,22 @@
   (:method ((term negation-term) context)
     (declare (ignore context))
     (argument term)))
+
+;;; Conjoin and disjoin would be nicer names for the following functions, but
+;;; then we would have to shadow the corresponding symbols from the Common
+;;; Lisp package, which is probably not worth the effort.
+
+(defun make-conjunction (term &rest additional-terms)
+  (make-instance 'conjunction-term
+    :arguments (cons term additional-terms)
+    :context (context term)
+    :source :generated-term))
+
+(defun make-disjunction (term &rest additional-terms)
+  (make-instance 'disjunction-term
+    :arguments (cons term additional-terms)
+    :context (context term)
+    :source :generated-term))
 
 (defun build-quantified-term (class term context globalp)
   (let ((context (make-instance 'local-context :enclosing-context context))
@@ -541,8 +557,8 @@
     (declare (ignore context))
     (let ((keywords (keywords declaration)))
       (when (getf keywords :rewrite-too)
-        (remove-from-plistf keywords :rewrite-too)
         (setf rewrite-too t))
+      (remove-from-plistf keywords :rewrite-too)
       (cond ((eql supported :always)
              (setf keywords (list* :supported t
                                    (remove-from-plist keywords :supported))))
@@ -563,8 +579,8 @@
     (declare (ignore context))
     (let ((keywords (keywords declaration)))
       (when (getf keywords :rewrite-too)
-        (remove-from-plistf keywords :rewrite-too)
         (setf rewrite-too t))
+      (remove-from-plistf keywords :rewrite-too)
       (cond ((eql supported :always)
              (setf keywords (list* :supported t
                                    (remove-from-plist keywords :supported))))
@@ -583,8 +599,7 @@
   (:method ((declaration rewrite-assertion-term)
             &key context rewrite-too supported)
     (declare (ignore context rewrite-too supported))
-    (when (getf (keywords declaration) :rewrite-too)
-      (remove-from-plistf (keywords declaration) :rewrite-too))
+    (remove-from-plistf (keywords declaration) :rewrite-too)
     (apply #'snark:assert-rewrite
            (to-sexpr (sentence declaration))
            (keywords declaration))
@@ -631,7 +646,7 @@
 (defvar *trace-unique-name-axiom-processing* nil)
 
 (defvar *assert-rewrite-for-declarations* nil)
-(defvar *assert-rewrite-for-preconditions* nil)
+(defvar *assert-rewrite-for-preconditions* t)
 (defvar *assert-rewrite-for-unique-names-axioms* nil)
 
 (defvar *support-declarations* nil)

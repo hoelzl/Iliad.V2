@@ -10,23 +10,6 @@
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 (5am:in-suite odysseus-syntax-suite)
 
-;;; Names
-;;; =====
-
-(defclass name-mixin ()
-  ((name
-    :accessor name :initarg :name :initform :<unnamed> :type symbol
-    :documentation "The name of the entity that inherits this mixin."))
-  (:documentation
-   "Mixin inherited by all classes that have names."))
-
-(defclass required-name-mixin (name-mixin)
-  ((name
-    :initform (required-argument :name)
-    :documentation "The name of the entity that inherits this mixin."))
-  (:documentation
-   "Mixin inherited by all classes that require a name."))
-
 ;;; Local Context Mixin
 ;;; ===================
 
@@ -620,10 +603,18 @@ or :ARG3 init-keywords is also provided."
   (:method ((term empty-program-term))
     t))
 
-(defclass primitive-action-term (known-general-application-term multi-solution-mixin)
+(defclass primitive-action-term
+    (known-general-application-term multi-solution-mixin)
   ()
   (:documentation
    "A term describing the execution of a primitive action."))
+
+(defun precondition-term (term situation)
+  "Create a precondition term for TERM in SITUATION."
+  (make-instance 'unknown-general-application-term
+    :operator 'poss
+    :arguments (list term situation)
+    :context (context term)))
 
 (defmethod clone-multi-solution-term-increasing-depth ((term primitive-action-term))
   (make-instance (class-of term)
@@ -899,6 +890,20 @@ or :ARG3 init-keywords is also provided."
 
 (defmethod operator ((term constant-declaration-term))
   'declare-constant)
+
+(defmethod declare-constant-sort ((constant constant-declaration-term) context)
+    (let* ((keys (keywords constant))
+           (sort (getf keys :sort)))
+      (when sort
+        (let* ((sort-table (constants-for-sort-table context))
+               (constants (gethash* sort sort-table  '())))
+          (unless (member constant constants)
+            (setf (gethash sort sort-table) 
+                  (cons (make-instance 'primitive-term 
+                          :value (name constant)
+                          :context context
+                          :source :generated-term)
+                        constants)))))))
 
 (defclass unique-constant-declaration-term (constant-declaration-term unique-term-mixin)
   ()

@@ -63,8 +63,8 @@
                 (= a (sleep p))
                 (and (is-rested-p p s)
                  (not (= a (work p)))))))
-                 :rewrite-too t :supported nil :sequential t)
-
+            :rewrite-too t :supported t :sequential t)
+    
     ;; Axiom for IS-PARENT-P
     (assert '(forall ((p :sort person)
                       (a :sort action)
@@ -117,6 +117,9 @@
 
 (defexample interpret-01d (:set-up-function 'set-up-ewsc-theory)
   (celebrate matthias))
+
+(defexample interpret-01e (:set-up-function 'set-up-ewsc-theory)
+  (celebrate ?p.person))
 
 (defexample interpret-02 (:set-up-function 'set-up-ewsc-theory)
   (seq
@@ -197,6 +200,42 @@
    (work ?p.person)
    (eat ?p.person)
    (celebrate ?p.person)))
+
+(defexample interpret-09a.1 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (eat ?p.person)
+   (work ?p.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-09a.2 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (work ?p.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-09a.3 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (celebrate ?p.person)))
+
+(defexample interpret-09a.4 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (work annabelle)
+   (celebrate ?p.person)))
+
+(defexample interpret-09a.5 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (work ?p1.person)
+   (celebrate ?p.person)))
+
+(defexample interpret-09a.6 (:set-up-function 'set-up-ewsc-theory
+                             :hidden? t)
+  (search
+   (work annabelle)
+   (celebrate annabelle)))
 
 (defexample interpret-09b (:set-up-function 'set-up-ewsc-theory)
   (search
@@ -371,9 +410,11 @@
 (defun run-09j-2 ()
   (let ((od::*unique-variable-counter* 0)
         (*random-state*
+          #+CCL
           #.(ccl::initialize-mrg31k3p-state 2050483999 1800982157
                                             1285892873 1931966779
-                                            662038711 1757111211))
+                                            662038711 1757111211)
+          #-CCL (make-random-state))
         (*permute-offline-choice* nil))
     (run-example 'interpret-09j)))
 
