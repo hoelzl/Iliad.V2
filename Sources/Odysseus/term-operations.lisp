@@ -651,7 +651,7 @@
 
 (defvar *support-declarations* nil)
 (defvar *support-preconditions* nil)
-(defvar *support-unique-name-axioms** nil)
+(defvar *support-unique-name-axioms* nil)
 
 
 (defgeneric set-up-snark (compilation-context)
@@ -683,6 +683,6 @@
       (process-declaration-for-snark
        declaration
        :context context
-       :supported *support-unique-name-axioms**
+       :supported *support-unique-name-axioms*
        :rewrite-too *assert-rewrite-for-unique-names-axioms*))
     :snark-setup-completed))

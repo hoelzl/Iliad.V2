@@ -135,9 +135,6 @@ returned as first argument.")
           (error 'cannot-execute-primitive-actions :interpreter interpreter)))))
 
 
-(define-condition online-mode-error (runtime-error)
-  ())
-
 (define-condition no-choice-point-creation-in-online-mode (online-mode-error)
   ()
   (:report (lambda (condition stream)
