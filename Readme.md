@@ -43,22 +43,23 @@ Odysseus
 Installation and Execution
 --------------------------
 
-We currently provide neither precompiled packages nor scripts to run
+I currently provide neither precompiled packages nor scripts to run
 *Iliad* from the command line.  Instead you have to download the
 sources and run *Iliad* from within your Lisp implementation of
-choice.
+choice.  Once the *Iliad* implementation becomes more stable I will
+make precompiled versions available.
 
 ### Prerequisites
 
 To run *Iliad* you need:
 
-* One of the supported Lisp implementations (CCL, CMUCL, ECL or SBCL,
-  see below for the exact versions that we are using).
+* One of the supported Lisp implementations (CCL, CMUCL or SBCL, see
+  below for the exact versions that I am using).
 * [ASDF 2](http://common-lisp.net/project/asdf/). This is already be
   included in all supported Lisp implementations.
 * [Quicklisp](http://www.quicklisp.org/) (If you install the required
   packages by hand you could dispense with Quicklisp, but this is not
-  something we would recommend.)
+  something I would recommend.)
 
 ### Installing from sources
 
@@ -95,10 +96,51 @@ following steps.
 
 ### Running the tests
 
-To run the test suite for *Odysseus*, enter the commands
+To run the unit test suite for *Odysseus*, enter the commands
 
     (asdf:load-system :odysseus-tests)
 	(5am:run! 'odysseus:odysseus-suite)
+
+Currently the unit tests mostly test the front end of the interpreter
+(terms and the parser).  Unit test for the interpreter are woefully
+lacking.  However, *Odysseus* now contains a suite of integration
+tests that test whether the execution of complete programs leads to
+the desired results.  To run the integration tests, proceed as follows:
+ 
+	ODYSSEUS-USER> (execute-all-tests)
+    Executed 177 tests.
+      Success:     177
+      Failure:     0
+	  
+    NIL
+
+You have to run the command from the `ODYSSEUS-USER` package,
+otherwise it will not find the test cases.  (Obviously, you also have
+to load the `ODYSSEUS-EXAMPLES` system in order to have the tests
+available.  If you want to see the results of the tests while the
+test-suite is executing, set the keyword argument
+`:SUPPRESS-ALL-OUTPUT` to true; if you want to output tracing
+information, set this keyword argument and `:TRACE` to true.  (This
+will generate a *lot* of output, though.)  Note that *Odysseus* uses a
+run-time-limit to cut off tests after a fixed amount of time, so
+depending on the speed of your machine you might obtain some test
+failures, even though everything works as expected.  (The correct fix
+for this would be to stop Snark after a certain number of inferences,
+not after a fixed amount of time, but this is not implemented, yet.)
+
+You can also record the result of examples and add them to the file
+with generated test.  The two most useful functions for doing this are
+`RECORD-OUTPUT-FOR-SINGLE-EXAMPLE` (together with
+`FILENAME-FOR-GENERATED-TESTS` to find the file to which the test
+should be added) and `RECORD-ALL-EXAMPLES` to record a complete run of
+all examples (even the hidden ones).  Currently it's only possible to
+record examples on CCL and SBCL; CMUCL writes random states in a
+format that it can not read back, so you have to edit the generated
+tests by hand for CMUCL.  To add support for test generation for
+another Lisp implementation, simply add a list with its implementation
+type (as returned by `LISP-IMPLEMENTATION-TYPE`) and a feature that
+can be used to guard tests to the variable
+`*FEATURES-FOR-LISP-TYPES*`.
 
 ### Working with the interpreters
 
@@ -243,7 +285,7 @@ About this Document
 <p align="right">
   <i>
     No one should ever let such nonsense pass his lips,<br/>
-    no one with any skill in fit and proper speech—<br/>
+    no one with any skill in fit and proper speech—<br/><br/>
   </i>
   —Homer. The Iliad.
 </p>
