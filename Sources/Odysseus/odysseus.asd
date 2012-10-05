@@ -22,4 +22,6 @@
 	       (:file "term-operations")
 	       (:file "parser")
 	       (:file "snark")
-	       (:file "interpreter")))
+	       (:file "interpreter")
+	       (:file "single-threaded-interpreter")
+	       (:file "constraint-solving")))
