@@ -244,16 +244,14 @@
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09c (:set-up-function 'set-up-ewsc-theory
-                           :hidden? t)
+(defexample interpret-09c (:set-up-function 'set-up-ewsc-theory)
   (seq
    (eat ?p.person)
    (eat ?p.person)
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09d (:set-up-function 'set-up-ewsc-theory
-                           :hidden? t)
+(defexample interpret-09d (:set-up-function 'set-up-ewsc-theory)
   (search
    (eat ?p.person)
    (work ?p.person)
@@ -262,8 +260,7 @@
    (eat ?p.person)
    (celebrate ?p.person)))
 
-(defexample interpret-09e (:set-up-function 'set-up-ewsc-theory
-                           :hidden? t)
+(defexample interpret-09e (:set-up-function 'set-up-ewsc-theory)
   (search
    (choose
     (work ?p.person)
@@ -352,6 +349,15 @@
    (eat ?p.person)
    (eat ?p.person)
    (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
    (celebrate ?p.person)))
 
 (defexample interpret-09h (:set-up-function 'set-up-ewsc-theory
@@ -365,12 +371,48 @@
    (eat ?p.person)
    (eat ?p.person)
    (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
    (celebrate ?p.person)))
 
 (defexample interpret-09i (:set-up-function 'set-up-ewsc-theory
                            :hidden? t)
   (search
    (work ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
+   (eat ?p.person)
    (eat ?p.person)
    (eat ?p.person)
    (eat ?p.person)

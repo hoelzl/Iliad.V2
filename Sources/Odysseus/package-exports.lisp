@@ -14,13 +14,18 @@
       ;; Errors
       #:runtime-error
       #:invalid-class
+      #:online-mode-error
       ;; Tracing
       #:trace-odysseus-p #:trace-odysseus #:untrace-odysseus
       ;; MOP
       #:define-method
+      ;; Lisp implementation
+      #:*features-for-lisp-types*
+      #:feature-for-lisp-type
       ;; General utilities
       #:unquote
       #:wrap-in-quote #:wrap-in-forall
+      #:sexpr-equal-p
       #:defglobal
       #:gethash*
       ;; Three-valued logic
@@ -252,7 +257,6 @@
   (defvar *odysseus-interpreter-exports*
     '(#:no-state-for-situation
       #:no-next-choice-point
-      #:online-mode-error
       #:no-backtracking-in-online-mode
       #:no-choice-point-creation-in-online-mode
       #:unbound-variable-during-online-execution

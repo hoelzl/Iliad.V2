@@ -107,7 +107,7 @@
                        (multiple-value-bind (successp new-situation)
                            (try-to-finish-interpretation interpreter new-situation)
                          (if successp
-                             (values (to-sexpr new-situation) t)
+                             (values t (to-sexpr new-situation))
                              (backtrack interpreter
                                         :reason "Deferred actions failed"
                                         :continuation-function #'recurse))))
@@ -116,8 +116,8 @@
         (handler-case
             (recurse interpreter term situation)
           (runtime-error (condition)
-            (values (or error-value (class-name (class-of condition)))
-                    nil)))
+            (values nil
+                    (or error-value (class-name (class-of condition))))))
         (recurse interpreter term situation))))
 
 ;;; Default Interpreter

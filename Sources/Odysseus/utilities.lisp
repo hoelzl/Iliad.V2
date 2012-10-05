@@ -58,8 +58,14 @@
                        thing sort-1 sort-2)))))
 
 
+(define-condition online-mode-error (runtime-error)
+  ()
+  (:documentation
+   "Error raised if an operation is attempted that cannot be performed
+   online."))
+
 ;;; Tracing
-;;; -------
+;;; =======
 
 (defvar *trace-odysseus* t)
 
@@ -72,6 +78,20 @@
 (defun untrace-odysseus ()
   (setf *trace-odysseus* nil))
 
+
+;;; Information about the Lisp version
+;;; ==================================
+
+(defvar *features-for-lisp-types*
+  '(("Clozure Common Lisp" :ccl :ccl-1.8 :clozure :clozure-common-lisp)
+    ("SBCL" :sbcl)
+    ("CMU Common Lisp" :cmucl :cmu :cmu20)))
+
+(defun feature-for-lisp-type (&optional (lisp-type (lisp-implementation-type)))
+  (or (second (assoc lisp-type *features-for-lisp-types* :test #'string-equal))
+      (cerror "Return :UNKNOWN-LISP"
+              "There is no known feature for ~A." lisp-type)
+      :unknown-lisp))
 
 ;;; General utilities
 ;;; =================
@@ -105,6 +125,53 @@
   (if variables
       (list 'forall variables term)
       term))
+
+(defun sexpr-equal-p (x y &optional (symbol-map (make-hash-table)))
+  "This function is based on CCL's definition of EQUALP, and modified to be
+useful for approximate comparison of sexprs for terms.  If X and Y are symbols
+they are regarded as equal and stored in the symbol-map if they do not already
+appear in the symbol map as different symbols."
+  (cond ((eql x y) t)
+        ((and (symbolp x) (symbolp y))
+         (if (not (symbol-package x))
+             (and (not (symbol-package y))
+                  (string-equal (symbol-name x) (symbol-name y)))
+             (if-let (x-val (gethash x symbol-map))
+               (if (eq x-val y) t nil)
+               (if-let (y-val (gethash y symbol-map))
+                 (if (eq y-val x) t nil)
+                 (progn (setf (gethash x symbol-map) y
+                              (gethash y symbol-map) x)
+                        t)))))
+        ((characterp x) (and (characterp y) (eq (char-upcase x) (char-upcase y))))
+        ((numberp x) (and (numberp y) (= x y)))
+        ((consp x)
+         (and (consp y)
+              (sexpr-equal-p (car x) (car y) symbol-map)
+              (sexpr-equal-p (cdr x) (cdr y) symbol-map)))
+        ((pathnamep x) (equal x y))
+        ((vectorp x)
+         (and (vectorp y)
+              (let ((length (length x)))
+                (when (eq length (length y))
+                  (dotimes (i length t)
+                    (declare (fixnum i))
+                    (let ((x-el (aref x i))
+                          (y-el (aref y i)))
+                      (unless (or (eq x-el y-el) (equalp x-el y-el))
+                        (return nil))))))))
+        ((arrayp x)
+         (error "SEXPR-EQUAL-P for arrays not currently implemented."))
+        ((and (typep x 'snark::variable) (typep y 'snark::variable))
+         (eq x y))
+        ((and (typep x 'structure-object) (typep y 'structure-object))
+         (error "SEXPR-EQUAL-P for general structures not currently implemented."))
+        ((and (hash-table-p x) (hash-table-p y))
+         (error "SEXPR-EQUAL-P for hash tables not currently implemented."))
+	((and (random-state-p x) (random-state-p y))
+         (error "SEXPR-EQUAL-P for random states not currently implemented"))
+        (t nil)))
+
 
 ;;; Helper Methods for the MOP
 ;;; ==========================
