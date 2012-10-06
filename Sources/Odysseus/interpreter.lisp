@@ -32,7 +32,10 @@
 (defclass interpreter ()
   ((superordinate-interpreter
     :accessor superordinate-interpreter :initarg :subordinate-interpreter
-    :initform nil))
+    :initform nil)
+   (interpreter-uuid
+    :accessor interpreter-uuid :initarg :uuid
+    :initform (make-uuid-symbol)))
   (:documentation
    "The base class of all interpreters."))
 
@@ -367,7 +370,10 @@ raises an error otherwise.")
       (call-next-method)))
 
 (defclass basic-interpreter-memento ()
-  ((state-map
+  ((interpreter-uuid
+    :accessor interpreter-uuid :initarg :uuid
+    :initform (required-argument :uuid))
+   (state-map
     :accessor state-map :initarg :state-map
     :initform (required-argument :state-map))
    (stored-actions
@@ -387,14 +393,28 @@ raises an error otherwise.")
 
 (defmethod interpreter-memento ((interpreter basic-interpreter))
   (make-instance 'basic-interpreter-memento
+    :uuid (interpreter-uuid interpreter)
     :state-map (copy-hash-table (state-map interpreter))
     :stored-actions (stored-actions interpreter)
     :stored-continuations (stored-continuations interpreter)
     :deferred-proofs (deferred-proofs interpreter)
     :onlinep (onlinep interpreter)))
 
+(define-condition wrong-interpreter-uuid (runtime-error)
+  ((interpreter :initarg :interpreter)
+   (memento :initarg :memento))
+  (:report (lambda (condition stream)
+             (with-slots (interpreter memento) condition
+               (format stream "UUID of interpreter ~A differs from Memento:~%  ~W~%  ~W."
+                       interpreter
+                       (interpreter-uuid interpreter)
+                       (interpreter-uuid memento))))))
+
 (defmethod (setf interpreter-memento)
     ((memento basic-interpreter-memento) (interpreter basic-interpreter))
+  (unless (eql (interpreter-uuid interpreter) (interpreter-uuid memento))
+    (cerror "Try to set the interpreter's state to the memento anyway."
+            'wrong-interpreter-uuid))
   (setf (state-map interpreter)            (state-map memento)
         (stored-actions interpreter)       (stored-actions memento)
         (stored-continuations interpreter) (stored-continuations memento)

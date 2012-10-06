@@ -117,30 +117,35 @@ the desired results.  To run the integration tests, proceed as follows:
 You have to run the command from the `ODYSSEUS-USER` package,
 otherwise it will not find the test cases.  (Obviously, you also have
 to load the `ODYSSEUS-EXAMPLES` system in order to have the tests
-available.  If you want to see the results of the tests while the
+available.)  If you want to see the results of the tests while the
 test-suite is executing, set the keyword argument
 `:SUPPRESS-ALL-OUTPUT` to true; if you want to output tracing
 information, set this keyword argument and `:TRACE` to true.  (This
 will generate a *lot* of output, though.)  Note that *Odysseus* uses a
-run-time-limit to cut off tests after a fixed amount of time, so
+run-time limit to cut off tests after a fixed amount of time, so
 depending on the speed of your machine you might obtain some test
 failures, even though everything works as expected.  (The correct fix
 for this would be to stop Snark after a certain number of inferences,
 not after a fixed amount of time, but this is not implemented, yet.)
 
 You can also record the result of examples and add them to the file
-with generated test.  The two most useful functions for doing this are
-`RECORD-OUTPUT-FOR-SINGLE-EXAMPLE` (together with
+with generated tests.  The two most useful functions for doing this
+are `RECORD-OUTPUT-FOR-SINGLE-EXAMPLE` (together with
 `FILENAME-FOR-GENERATED-TESTS` to find the file to which the test
 should be added) and `RECORD-ALL-EXAMPLES` to record a complete run of
 all examples (even the hidden ones).  Currently it's only possible to
-record examples on CCL and SBCL; CMUCL writes random states in a
-format that it can not read back, so you have to edit the generated
-tests by hand for CMUCL.  To add support for test generation for
-another Lisp implementation, simply add a list with its implementation
-type (as returned by `LISP-IMPLEMENTATION-TYPE`) and a feature that
-can be used to guard tests to the variable
-`*FEATURES-FOR-LISP-TYPES*`.
+record examples in a fully automatic manner on CCL and SBCL.  CMUCL
+(version 20c) writes random states in a format that it can not read
+back, so you have to edit the generated tests by hand.  To add support
+for test generation for another Lisp implementation, simply add a list
+describing the implementation to the variable
+`*FEATURES-FOR-LISP-TYPES*`.  This list has to contain the
+implementation type (as returned by `LISP-IMPLEMENTATION-TYPE`) as
+first element and one or more features that can be used to guard tests
+as subsequent elements, e.g., the entry for CCL has the form
+
+    ("Clozure Common Lisp" :ccl :ccl-1.8 :clozure :clozure-common-lisp)
+
 
 ### Working with the interpreters
 

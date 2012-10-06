@@ -28,6 +28,7 @@
       #:sexpr-equal-p
       #:defglobal
       #:gethash*
+      #:make-uuid #:make-uuid-symbol
       ;; Three-valued logic
       #:boolean3
       #:and3 #:or3 #:not3

@@ -172,6 +172,22 @@ appear in the symbol map as different symbols."
          (error "SEXPR-EQUAL-P for random states not currently implemented"))
         (t nil)))
 
+(defun random-hex-list (length)
+  (if (<= length 0)
+      '()
+      (cons (random 16) (random-hex-list (1- length)))))
+
+(defun make-uuid (&optional (stream nil))
+  "A simple (inefficient and probably incorrect) implementation of type 4
+UUIDs."
+  (format stream
+          "~{~X~}-~{~X~}-4~{X~X~}-A~{~X~}-~{~X~}"
+          (random-hex-list 8) (random-hex-list 4)
+          (random-hex-list 3) (random-hex-list 3)
+          (random-hex-list 12)))
+
+(defun make-uuid-symbol (&optional (package (find-package '#:keyword)))
+  (intern (uuid) package))
 
 ;;; Helper Methods for the MOP
 ;;; ==========================
