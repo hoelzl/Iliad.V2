@@ -187,7 +187,7 @@ UUIDs."
           (random-hex-list 12)))
 
 (defun make-uuid-symbol (&optional (package (find-package '#:keyword)))
-  (intern (uuid) package))
+  (intern (make-uuid) package))
 
 ;;; Helper Methods for the MOP
 ;;; ==========================
