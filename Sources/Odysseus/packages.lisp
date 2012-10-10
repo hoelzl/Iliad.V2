@@ -8,7 +8,7 @@
 (in-package :common-lisp-user)
 
 (defpackage #:odysseus
-  (:use #:common-lisp #:alexandria #:iterate)
+  (:use #:closer-common-lisp #:alexandria #:iterate #:hu.dwim.stefil)
   (:import-from #:snark-lisp
                 #:forall #:exists #:not #:iff)
   (:nicknames #:od)
@@ -76,10 +76,5 @@
   (:export . #.*odysseus-interpreter-exports*))
 
 (defpackage #:odysseus-user
-  (:use #:common-lisp #:alexandria #:iterate
-        #:common-lisp-user
+  (:use #:closer-common-lisp-user #:alexandria #:iterate
         #:odysseus))
-
-(defpackage #:odysseus-tests
-  (:use #:common-lisp #:alexandria #:iterate
-	#:odysseus))

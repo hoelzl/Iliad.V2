@@ -9,6 +9,17 @@
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
 
+(defun interpret-one-step (term
+                           &key (interpreter (default-interpreter))
+                                (situation (make-instance 'initial-situation))
+                                (error-value nil))
+  "A variant of INTERPRET-1 that takes the same arguments as INTERPRET so that
+it can be called as INTERPRET-FUNCTION of ODYSSEUS-EXAMPLE."
+  (declare (ignore error-value))
+  (multiple-value-bind (term situation substitution continuations)
+      (interpret-1 interpreter term situation)
+    (values term (list (to-sexpr situation) substitution continuations))))
+
 (defvar *odysseus-examples*
   (make-hash-table))
 
@@ -26,6 +37,9 @@
 	 :initform (required-argument :name))
    (term :accessor term :initarg :term
 	 :initform (required-argument :term))
+   (interpret-function :accessor interpret-function
+                       :initarg :interpret-function
+                       :initform 'interpret)
    (set-up-function :accessor set-up-function :initarg :set-up-function
                     :initform (required-argument :set-up-function))
    (max-solution-depth :accessor max-solution-depth 
@@ -60,8 +74,10 @@
     (when example
       (full-source-code (find-example example))))
   (:method ((example odysseus-example))
-    (append (funcall (set-up-function example))
-            (list (term example)))))
+    (if (set-up-function example)
+        (append (funcall (set-up-function example))
+                (list (term example)))
+        (term example))))
 
 (defvar *odysseus-test-variables*
   '(od::*store-all-non-refuted-proof-terms*
@@ -168,7 +184,7 @@
             &key (execution-mode :offline)
                  record-trace-p)
     (let ((interpreter (default-interpreter)))
-      (reset-interpreter interpreter t)
+      (reset-interpreter interpreter)
       (setf (onlinep interpreter) (eql execution-mode :online))
       (format t "~&Running example ~A in mode ~A.~%"
 	      (name example) execution-mode)
@@ -180,7 +196,7 @@
                            nil))
             (odysseus::*default-max-solution-depth* (max-solution-depth example)))
         (multiple-value-bind (success? result)
-            (apply 'interpret
+            (apply (interpret-function example)
                    (full-source-code example)
                    :interpreter interpreter
                    (keys example))

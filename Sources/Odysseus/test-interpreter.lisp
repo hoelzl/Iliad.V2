@@ -5,8 +5,7 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-tests)
+(in-package #:odysseus)
 
-#+5am
-(5am:in-suite odysseus-interpreter-suite)
+(in-suite odysseus-interpreter-suite)
 

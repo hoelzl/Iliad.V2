@@ -19,25 +19,31 @@
 ;;; The Class INTERPRETER
 ;;; ---------------------
 
-(defgeneric superordinate-interpreter (interpreter)
-  (:documentation
-   "A superordinate interpreter that uses INTERPRETER for various tasks.  This
-   is used to return control to the superordinate interpreter for action that
-   INTERPRETER can't handle itself."))
-
-(defgeneric (setf superordinate-interpreter) (superordinate interpreter)
-  (:documentation
-   "Sets the superordinate interpreter of INTERPRETER to SUPERORDINATE."))
-
 (defclass interpreter ()
-  ((superordinate-interpreter
-    :accessor superordinate-interpreter :initarg :subordinate-interpreter
-    :initform nil)
-   (interpreter-uuid
+  ((interpreter-uuid
     :accessor interpreter-uuid :initarg :uuid
     :initform (make-uuid-symbol)))
   (:documentation
    "The base class of all interpreters."))
+
+
+(defgeneric superordinate-interpreter (interpreter)
+  (:documentation
+   "A superordinate interpreter that uses INTERPRETER for various tasks.  This
+   is used to return control to the superordinate interpreter for action that
+   INTERPRETER can't handle itself.")
+  (:method ((interpreter interpreter))
+    nil))
+
+
+(defgeneric reset-interpreter (interpreter)
+  (:documentation
+   "Resets the state of INTERPRETER by clearing all primitive actions,
+   fluents, etc.")
+  (:method ((interpreter interpreter))
+    (setf (context interpreter)
+          (make-instance (class-of (context interpreter))))))
+
 
 (define-condition cannot-interpret-term (runtime-error)
   ((interpreter :initarg :interpreter)
@@ -50,78 +56,130 @@
 (defgeneric interpret-1 (interpreter term situation)
   (:documentation
    "Interpret a single execution step of TERM using INTERPRETER in SITUATION.
-Returns the action performed by the term (an indirect instance of the class
-PRIMITIVE-ACTION-TERM), the residual term that results from the evaluation
-step, and the situation after executing the primitive action.  If no action
-was performed by this evaluation step, an instance of NO-OPERATION-TERM is
-returned as first argument.")
+Returns five values: 
+
+* An indication of the action performed by TERM, either an indirect instance
+  of the class PRIMITIVE-ACTION-TERM or NIL if the execution of TERM in
+  SITUATION is not possible.  If no action was performed by this evaluation
+  step, an instance of NO-OPERATION-TERM is returned as first argument.
+
+* The situation after executing the primitive action returned as first
+  argument or NIL if the first argument is NIL.
+
+* A SUBSTITUTION for the variables obtained by the constraint solver.
+
+* A deferred proof or NIL if either no proof was needed or if the proof was
+  successful.
+
+* A CONTINUATION-GENERATOR that can generate all continuations resuming this
+  computation.")
+
+  (:method :around ((interpreter interpreter) (term term) situation)
+    "A method for testing purposes; checks that we actually return the right
+number and types of arguments.."
+    (declare (ignore situation))
+    (multiple-value-bind
+          (action situation substitution deferred-proof continuation-generator)
+        (call-next-method)
+      (check-type action (or null primitive-action-term))
+      (check-type situation (or null situation))
+      (check-type substitution substitution)
+      (check-type deferred-proof (or null term))
+      (check-type continuation-generator continuation-generator)
+      (values action
+              situation
+              substitution
+              deferred-proof
+              continuation-generator)))
+
   (:method ((interpreter interpreter) (term term) situation)
     (let ((superordinate (superordinate-interpreter interpreter)))
       (if superordinate
           (interpret-1 superordinate term situation)
           (error 'cannot-interpret-term
                  :interpreter interpreter
-                 :term term)))))
+                 :term term))))
+
+  (:method ((interpreter interpreter) (term list) situation)
+    "Parse the program source into term representation and interpret the
+     term."
+    (interpret-1 interpreter
+                 (parse-into-term-representation term (context interpreter))
+                 situation))
+
+  (:method ((interpreter interpreter) (term symbol) situation)
+    "Parse the program source into term representation and interpret the
+     term."
+    (interpret-1 interpreter
+                 (parse-into-term-representation term (context interpreter))
+                 situation)))
 
 
-(defgeneric reset-interpreter (interpreter &optional complete?)
+(defgeneric prove (interpreter term
+                   &key solution-depth quantification-function)
   (:documentation
-   "Resets the state of INTERPRETER.  When COMPLETE? is false, removes all
-   choice points, saved states and other runtime information.  When COMPLETE?
-   is true, it also clears all primitive actions, fluents, etc.")
-  (:method ((interpreter interpreter) &optional (complete? nil))
-    (when complete?
-      (setf (context interpreter)
-            (make-instance (class-of (context interpreter)))))))
+   "Try to prove or refute TERM in INTERPRETER.
+SOLUTION-DEPTH is the number of calls to CLOSURE that we perform before
+returning the solution.  QUANTIFICATION-FUNCTION is the funcion used to close
+the free variables of the term.  This is usually UNIVERSALLY-QUANTIFY or
+EXISTENTIALLY-QUANTIFY."))
 
-(defgeneric can-continue-execution-p (interpreter)
+(define-condition can-execute-p-not-defined (runtime-error)
+  ((interpreter :initarg :interpreter)
+   (term :initarg :term)
+   (situation :initarg :situation))
+  (:report (lambda (condition stream)
+             (with-slots (interpreter term situation) condition
+                 (format stream
+                         "Cannot check whether ~A is executable by ~A in situation ~A."
+                         term interpreter situation)))))
+                     
+
+(defgeneric can-execute-p (interpreter primitive-action-term situation
+                           &key solution-depth)
   (:documentation
-   "Returns true if INTERPRETER can continue execution one-step execution.
-   The next term that should be processed is obtained by calling NEXT-TERM."))
+   "Returns true if it is possible to execute PRIMITIVE-ACTION-TERM in
+   SITUATION, false otherwise.")
+  (:method ((interpreter interpreter) term situation
+            &key (solution-depth 0))
+    (let ((superordinate (superordinate-interpreter interpreter)))
+      (if superordinate
+          (can-execute-p superordinate term situation
+                         :solution-depth solution-depth)
+          (error 'can-execute-p-not-defined
+                 :interpreter interpreter
+                 :term term
+                 :situation situation)))))
 
-(define-condition no-next-term (online-mode-error)
+(define-condition non-executing-interpreter-error
+    (runtime-error)
   ((interpreter :initarg :interpreter))
   (:report (lambda (condition stream)
              (with-slots (interpreter) condition
-               (format stream "Interpreter ~A has no next term."
+               (format stream
+                       "Interpreter ~A is not executing."
                        interpreter)))))
-
-(defgeneric next-term (interpreter)
-  (:documentation
-   "Returns the next term for one-step execution of INTERPRETER or raises a
-   condition of type NO-NEXT-TERM when no such term exists.  If
-   CAN-CONTINUE-EXECUTION-P returns true for INTERPRETER, NEXT-TERM must not
-   raise an error.")
-  (:method ((interpreter interpreter))
-    (error 'no-next-term :interpreter interpreter)))
-
 
 (defgeneric onlinep (interpreter)
   (:documentation
-   "Returns true, if INTERPRETER is currently in online mode."))
+   "Returns true, if INTERPRETER is executing in online mode, false otherwise.
+   Only defined for executing interpreters.")
+  (:method ((interpreter interpreter))
+    (if (superordinate-interpreter interpreter)
+        (onlinep (superordinate-interpreter interpreter))
+        (error 'non-executing-interpreter-error
+               :interpreter interpreter))))
 
-(defgeneric (setf onlinep) (new-value interpreter)
+(defgeneric run-interpreter-loop (interpreter term situation)
   (:documentation
-   "Sets the online mode of INTERPRETER."))
+   "Run INTERPRETER until if finishes execution or fails, starting with TERM
+   and in SITUATION.")
+  (:method ((interpreter interpreter) term situation)
+    (declare (ignore term situation))
+    (error 'non-executing-interpreter-error
+           :interpreter interpreter)))
 
-(defgeneric try-to-finish-interpretation (interpreter situation)
-  (:documentation
-   "Tries to finish all outstanding undecidable proofs and executes all stored
-   actions, if this is successful.  Returns a truth value indicating success
-   and the new situation after substituting the values obtained during the
-   proof."))
-
-(defgeneric execute-stored-actions (interpreter)
-  (:documentation
-   "Executes all stored actions of INTERPRETER."))
-
-(define-condition unbound-variable-during-online-execution (online-mode-error)
-  ()
-  (:report (lambda (condition stream)
-             (declare (ignore condition))
-             (format stream "Cannot execute actions containing variables in online mode."))))
-
-(define-condition cannot-execute-primitive-actions (runtime-error)
+(define-condition cannot-execute-primitive-action (runtime-error)
   ((interpreter :initarg :interpreter))
   (:report (lambda (condition stream)
              (with-slots (interpreter) condition
@@ -135,42 +193,49 @@ returned as first argument.")
     (let ((superordinate (superordinate-interpreter interpreter)))
       (if superordinate
           (execute-primitive-action superordinate term)
-          (error 'cannot-execute-primitive-actions :interpreter interpreter)))))
+          (error 'cannot-execute-primitive-action :interpreter interpreter)))))
 
 
-(define-condition no-choice-point-creation-in-online-mode (online-mode-error)
-  ()
-  (:report (lambda (condition stream)
-             (declare (ignore condition))
-             (format stream "Cannot create a choice point in online mode."))))
+(defvar *trace-continuation-creation* nil)
 
-
-(defgeneric make-choice-point (interpreter term situation)
+(defgeneric make-continuation (interpreter term situation deferred-proofs)
   (:documentation
-   "Creates a new choice point for TERM in SITUATION."))
+   "Creates a new continuation that evaluates TERM in SITUATION.")
+  (:method ((interpreter interpreter) term situation deferred-proofs)
+    (when (and *trace-odysseus* *trace-continuation-creation*)
+      (format t "~&Creating continuation for~28T~:W~%    Situation:~28T~:W~%"
+              term situation))
+    (make-instance 'continuation
+      :term term
+      :situation situation
+      :deferred-proofs deferred-proofs)))
 
-(defgeneric add-choice-point (interpreter term situation)
+
+
+(defgeneric make-continuation-generator
+    (interpreter term situation deferred-proofs reason answer)
   (:documentation
-   "Creates a new choice point by calling MAKE-CHOICE-POINT and adds it to the
-   choice points of INTERPRETER."))
+   "Creates a new CONTINUATION-GENERATOR.  The generator is non-empty if
+   REASON indicates that new continuations may lead to different
+  instantiations from repeating the previous proof, and a non-empty
+   continuation generator otherwise.")
+  (:method ((interpreter interpreter) term situation deferred-proofs reason answer)
+    (declare (ignore interpreter term situation deferred-proofs reason answer))
+    (warn "Calling default implementation of MAKE-CONTINUATION-GENERATOR.")
+    (make-instance 'empty-continuation-generator)))
 
-(defgeneric next-choice-point (interpreter)
-  (:documentation
-   "Returns the next available choice point."))
+
+(defmethod print-object ((self interpreter) stream)
+  (print-unreadable-object (self stream :type t)
+    (format stream "~A..."
+            (let ((uuid (interpreter-uuid self)))
+              (if (symbolp uuid)
+                  (subseq (symbol-name uuid) 0 8)
+                  uuid)))))
 
 
-(define-condition no-backtracking-in-online-mode (online-mode-error)
-  ()
-  (:report (lambda (condition stream)
-             (declare (ignore condition))
-             (format stream
-                     "Cannot backtrack to a previous choice point in online mode."))))
-
-(defgeneric backtrack (interpreter &key reason continuation-function)
-  (:documentation
-   "Abandons the current computation and applies CONTINUATION-FUNCTION to
-   INTERPRETER and the term and situation of the previous choice point.
-   REASON is only for diagnostic purposes."))
+;;; Forwarded Definitions from Context
+;;; ----------------------------------
 
 (defmethod the-empty-program-term ((interpreter interpreter))
   "Return the empty program term of INTERPRETER's context."
@@ -180,9 +245,6 @@ returned as first argument.")
   "Return the no-operation term of INTERPRETER's context."
   (the-no-operation-term (context interpreter)))
 
-
-;;; Forwarded Definitions from Context
-;;; ----------------------------------
 
 (defmethod primitive-action-definition
     (action-name (interpreter interpreter) &optional default)
@@ -213,213 +275,15 @@ returned as first argument.")
 
 ;;; The Class BASIC-INTERPRETER
 ;;; ---------------------------
-              
-(defclass top-level-context (compilation-unit)
-  ()
-  (:documentation
-   "The state of a basic interpreter."))
-
-(defclass choice-point ()
-  ((term
-    :accessor term :initarg :term
-    :initform (required-argument :term)
-    :documentation
-    "The term that should be used to resume the execution.")
-   (situation
-    :accessor situation :initarg :situation
-    :initform (required-argument :situation)
-    :documentation "The situation in which the choice point was captured.")
-   (interpreter-memento
-    :accessor interpreter-memento :initarg :interpreter-memento
-    :initform (required-argument :interpreter-memento)
-    :documentation
-    "The state of the interpreter at the time the choice point was captured.")))
-
-#+(or)
-(defclass repeated-choice-point (choice-point)
-  ((max-repetitions :accessor max-repetitions :initarg :max-repetitions
-                    :initform (required-argument :max-repetitions))
-   (current-repetition :accessor current-repetition :initarg :current-repetition
-                       :initform 0)))
 
 (defclass basic-interpreter (interpreter)
   ((context :accessor context :initarg :context
             :initform (make-instance 'compilation-unit))
-   (state-map
-    :accessor state-map :initarg :state-map
-    :initform (make-hash-table))
-   (choice-points
-    :accessor choice-points :initarg :choice-points
-    :initform '()
-    :documentation "A list of all available choice points.")
-   (stored-actions
-    :accessor stored-actions :initarg :stored-actions
-    :initform '())
-   (stored-continuations
-    :accessor stored-continuations :initarg :stored-continuations
-    :initform '())
-   (deferred-proofs
-    :accessor deferred-proofs :initarg :deferred-proofs
-    :initform '())
-   (onlinep 
-    :accessor onlinep :initarg :onlinep :initform t
-    :documentation "Returns T if the interpreter is in online mode."))
+   (superordinate-interpreter
+    :accessor superordinate-interpreter :initarg :subordinate-interpreter
+    :initform nil))
   (:default-initargs :context (make-instance 'top-level-context)))
 
-;;; The Protocol for Basic Interpreters
-;;; -----------------------------------
-
-(defgeneric interpreter-memento (interpreter)
-  (:documentation
-   "Returns a memento of INTERPRETER, i.e., its 'state' in a form that is
-suitable for storing it in a choice point."))
-
-(defgeneric (setf interpreter-memento) (new-memento interpreter)
-  (:documentation
-   "Restores INTERPRETER to the state in which NEW-MEMENTO was captured."))
-
-(defgeneric prove (interpreter term &key solution-depth)
-  (:documentation
-   "Try to prove or refute TERM in INTERPRETER."))
-
-(defgeneric can-execute-p (interpreter primitive-action-term situation
-                           &key solution-depth)
-  (:documentation
-   "Returns true if it is possible to execute PRIMITIVE-ACTION-TERM in
-   SITUATION, false otherwise."))
-
-(defgeneric stored-actions (interpreter)
-  (:documentation
-   "The actions stored during the offline execution of the interpreter, in
-    reverse order in which they should be executed."))
-
-(defgeneric (setf stored-actions) (new-actions interpreter)
-  (:documentation
-   "Updates the action stored during offline execution."))
-
-(defgeneric state-map (interpreter)
-  (:documentation
-   "Returns a map from situations to states."))
-
-(defgeneric (setf state-map) (new-state-map interpreter)
-  (:documentation
-   "Updates the complete state-map of INTERPRETER."))
-
-(defgeneric can-set-state-p (interpreter situation)
-  (:documentation
-   "Returns T if the state for INTERPRETER in SITUATION can be set, NIL
-   otherwise.  When this method returns T it must be possible to execute
-   (setf INTERPRETER SITUATION) successfully.")
-  (:method ((interpreter interpreter) situation)
-    (declare (ignore interpreter situation))
-    nil))
-
-
-(define-condition no-state-for-situation (runtime-error)
-  ((situation :reader situation :initarg :situation))
-  (:report (lambda (condition stream)
-             (format stream "No state for situation ~A."
-                     (situation condition)))))
-
-(defgeneric state (interpreter situation &optional errorp)
-  (:documentation
-   "Returns the state of INTERPRETER in SITUATION.
-If no state is available for SITUATION, STATE returns NIL if ERRORP is false,
-raises an error otherwise.")
-  (:method (interpreter situation &optional errorp)
-    (let ((state (gethash situation (state-map interpreter) nil)))
-      (or state
-          (cond (errorp
-                 (restart-case
-                     (error 'no-state-for-situation :situation situation)
-                   (provide-state (state)
-                     :test (lambda () (can-set-state-p interpreter situation))
-                     :report "Provide a state for the situation."
-                     :interactive (lambda ()
-                                    (format t "Enter a new situation: ")
-                                    (list (eval (read))))
-                     (setf (state interpreter situation) state))))
-                (t nil))))))
-
-(defgeneric (setf state) (new-state interpreter situation)
-  (:documentation
-   "Sets the state for INTERPRETER in SITUATION."))
-
-
-(defmethod print-object ((self basic-interpreter) stream)
-  (print-unreadable-object (self stream :type t)
-    (format stream "(~:[OFFLINE~;ONLINE~])"
-            (onlinep self))))
-
-
-(defmethod reset-interpreter
-    ((interpreter basic-interpreter) &optional (complete? nil))
-  (call-next-method interpreter complete?)
-  (setf (state-map interpreter) (make-hash-table)
-        (choice-points interpreter) '()
-        (stored-actions interpreter) '()
-        (stored-continuations interpreter) '()
-        (deferred-proofs interpreter) '()
-        (onlinep interpreter) t))
-
-(defmethod can-continue-execution-p ((interpreter basic-interpreter))
-  (not (null (stored-continuations interpreter))))
-
-(defmethod next-term ((interpreter basic-interpreter))
-  (or (pop (stored-continuations interpreter))
-      (call-next-method)))
-
-(defclass basic-interpreter-memento ()
-  ((interpreter-uuid
-    :accessor interpreter-uuid :initarg :uuid
-    :initform (required-argument :uuid))
-   (state-map
-    :accessor state-map :initarg :state-map
-    :initform (required-argument :state-map))
-   (stored-actions
-    :accessor stored-actions :initarg :stored-actions
-    :initform (required-argument :stored-actions))
-   (stored-continuations
-    :accessor stored-continuations :initarg :stored-continuations
-    :initform (required-argument :stored-continuations))
-   (deferred-proofs
-    :accessor deferred-proofs :initarg :deferred-proofs
-    :initform (required-argument :deferred-proofs))
-   (onlinep
-    :accessor onlinep :initarg :onlinep
-    :initform (required-argument :onlinep)))
-  (:documentation
-   "The memento for a basic interpreter."))
-
-(defmethod interpreter-memento ((interpreter basic-interpreter))
-  (make-instance 'basic-interpreter-memento
-    :uuid (interpreter-uuid interpreter)
-    :state-map (copy-hash-table (state-map interpreter))
-    :stored-actions (stored-actions interpreter)
-    :stored-continuations (stored-continuations interpreter)
-    :deferred-proofs (deferred-proofs interpreter)
-    :onlinep (onlinep interpreter)))
-
-(define-condition wrong-interpreter-uuid (runtime-error)
-  ((interpreter :initarg :interpreter)
-   (memento :initarg :memento))
-  (:report (lambda (condition stream)
-             (with-slots (interpreter memento) condition
-               (format stream "UUID of interpreter ~A differs from Memento:~%  ~W~%  ~W."
-                       interpreter
-                       (interpreter-uuid interpreter)
-                       (interpreter-uuid memento))))))
-
-(defmethod (setf interpreter-memento)
-    ((memento basic-interpreter-memento) (interpreter basic-interpreter))
-  (unless (eql (interpreter-uuid interpreter) (interpreter-uuid memento))
-    (cerror "Try to set the interpreter's state to the memento anyway."
-            'wrong-interpreter-uuid))
-  (setf (state-map interpreter)            (state-map memento)
-        (stored-actions interpreter)       (stored-actions memento)
-        (stored-continuations interpreter) (stored-continuations memento)
-        (deferred-proofs interpreter)      (deferred-proofs memento)
-        (onlinep interpreter)              (onlinep memento)))
 
 (defvar *print-snark-refutations* t)
 (defvar *print-snark-undecidables* t)
@@ -453,107 +317,18 @@ raises an error otherwise.")
 (defmethod can-execute-p
     ((interpreter basic-interpreter) (term primitive-action-term) situation
      &key (solution-depth 0))
-  (let ((action-def (primitive-action-definition (operator term) interpreter)))
-    (if (not (action-precondition action-def))
-        ;; Terms without precondition can always execute.
-        (values t :no-precondition '() '())
-        ;; TERM has a precondition.  Pass it to Snark for evaluation.
-        (let ((proof-term (precondition-term term situation)))
-          (prove interpreter proof-term
-                 :solution-depth solution-depth
-                 :quantification-function 'existentially-quantify)))))
-
-(defmethod execute-stored-actions ((interpreter basic-interpreter))
-  (let ((actions (nreverse (stored-actions interpreter)))
-        (old-onlinep (onlinep interpreter)))
-    (when actions
-      (when *trace-odysseus*
-        (format t "~&>>> Executing stored actions.~%"))
-      (setf (onlinep interpreter) nil)
-      (dolist (action actions)
-        (execute-primitive-action interpreter action))
-      (setf (onlinep interpreter) old-onlinep)
-      (setf (stored-actions interpreter) '()))))
-
-(defmethod make-choice-point
-    ((interpreter interpreter) term situation)
-  (when (onlinep interpreter)
-    (cerror "Create the choice point anyway."
-            'no-choice-point-creation-in-online-mode))
-  (let ((cp (make-instance
-             'choice-point
-             :term term
-             :situation situation
-             :interpreter-memento (interpreter-memento interpreter))))
-    ;; (push cp (choice-points interpreter))
-    cp))
-
-(defvar *trace-choice-point-creation* nil)
-
-(defmethod add-choice-point
-    ((interpreter basic-interpreter) term situation)
-  (when (and *trace-odysseus* *trace-choice-point-creation*)
-    (format t "~&Creating choice point for~28T~:W~%    Situation:~28T~:W~%"
-            term situation))
-  (let ((cp (make-choice-point interpreter term situation)))
-    (setf (choice-points interpreter)
-          (append (choice-points interpreter) (list cp)))))
+  (if (not (action-precondition term))
+      ;; Terms without precondition can always execute.
+      (values t :no-precondition '() '())
+      ;; TERM has a precondition.  Pass it to Snark for evaluation.
+      (let ((proof-term (precondition-term term situation)))
+        (prove interpreter proof-term
+               :solution-depth solution-depth
+               :quantification-function 'existentially-quantify))))
 
 
-(define-condition no-next-choice-point (runtime-error)
-  ()
-  (:report (lambda (condition stream)
-             (declare (ignore condition))
-             (format stream "Tried to backtrack, but no choice point is left.")))) 
-
-(defmethod next-choice-point ((interpreter basic-interpreter))
-  (if (null (choice-points interpreter))
-      (error 'no-next-choice-point)
-      ;; This should be controllable by an execution strategy.
-      (pop (choice-points interpreter))))
-
-(defmethod backtrack ((interpreter interpreter)
-                      &key reason (continuation-function 'interpret-1))
-  (let ((choice-point (next-choice-point interpreter)))
-    (when (onlinep interpreter)
-      (cerror "Backtrack anyway."
-              'no-backtracking-in-online-mode))
-    (when *trace-odysseus*
-      (format t "~&~:[Backtracking~;~:*~A~].~%" reason))
-    (setf (interpreter-memento interpreter)
-          (interpreter-memento choice-point))
-    (funcall continuation-function
-             interpreter (term choice-point) (situation choice-point))))
-
-(defmethod can-set-state-p ((interpreter basic-interpreter) situation)
-  (declare (ignore interpreter situation))
-  t)
-
-(defmethod (setf state) (new-state (interpreter basic-interpreter) situation)
-  (cond ((can-set-state-p interpreter situation)
-         (setf (gethash situation (state-map interpreter))
-               new-state))
-        (t
-         (cerror "Try setting the state anyway."
-                 "Cannot set state for situation ~A in interpreter ~A."
-                 situation interpreter)
-         (setf (gethash situation (state-map interpreter))
-               new-state))))
-
-
-;;; Single-Step Interpretation
-;;; ==========================
-
-(defmethod interpret-1
-    ((interpreter basic-interpreter) (term list) situation)
-  "Parse the program source into term representation and interpret the term."
-  (interpret-1 interpreter
-               (parse-into-term-representation term (context interpreter))
-               situation))
-
-
-;;; Utilities for interpretation functions
-;;; --------------------------------------
+;;; Utilities for Single-Step Interpretation
+;;; ========================================
 
 (defun maybe-output-execution-trace-information
     (action term reason free-variables answer)
@@ -570,32 +345,16 @@ raises an error otherwise.")
                 (mapcar 'to-sexpr free-variables)
                 answer))))
 
-(defun perform-substitutions-in-interpreter
-    (interpreter term situation free-variables answer)
-  "Substitutes the values for FREE-VARIABLES bound in ANSWER into TERM,
-SITUATION and the stored actions and continuation of INTERPRETER."
+(defun make-substitution-for-interpreter (interpreter free-variables answer)
+  "Creates a substitution for the values of FREE-VARIABLES bound in ANSWER"
   (let* ((local-context (make-instance 'local-context
                           :enclosing-context (context interpreter)))
          (new-terms
            (mapcar (lambda (exp)
                      (parse-into-term-representation exp local-context))
                    (rest answer))))
-    (when new-terms
-      (labels ((substitute-in (term)
-                 (substitute-terms new-terms free-variables term))
-               (substitute-all (list)
-                 (mapcar #'substitute-in list)))
-        (setf term 
-              (substitute-in term))
-        (setf (stored-actions interpreter) 
-              (substitute-all (stored-actions interpreter)))
-        (setf (stored-continuations interpreter)
-              (substitute-all (stored-continuations interpreter)))
-        (setf (deferred-proofs interpreter)
-              (substitute-all (deferred-proofs interpreter)))
-        (unless (onlinep interpreter)
-          (setf situation (substitute-in situation)))))
-    (values term situation)))
+    (make-instance 'substitution
+      :old-terms free-variables :new-terms new-terms)))
 
 
 (defun proof-and-substitution-found
@@ -612,72 +371,68 @@ found and ANSWER contain at least one non-variable value."
                     (rest answer)))
         t)))
 
-(defgeneric maybe-add-choice-point (interpreter term situation reason answer)
-  (:documentation
-   "Adds a choice point, if this may lead to further results.")
-  
-  (:method ((interpreter basic-interpreter) term situation reason answer)
-    "The default method adds choice points only if a proof was found that
-contains substitutions that do not only consist of variables."
-    (if (not (onlinep interpreter))
-        (cond ((proof-and-substitution-found reason answer)
-               (add-choice-point
-                interpreter
-                (clone-multi-solution-term-increasing-depth term)
-                situation)
-               :proof-and-substitution-found)
-              (t
-               :no-proof-or-proof-and-no-substitution))
-        :offline))
 
-  (:method ((interpreter basic-interpreter) (term primitive-action-term)
-                    situation reason answer)
-    (declare (ignore situation reason answer))
-    (if (action-precondition term)
-        (call-next-method)
-        :no-action-precondition)))
+;;; Executing Interpreter
+;;;
 
-
-
-;;; Interpretation
-;;; ==============
-
-;;; The following are possible variants for (multi-step) interpreters.
-
-(defclass printing-interpreter (interpreter)
+(defclass executing-interpreter (interpreter)
   ((subordinate-interpreter
     :accessor subordinate-interpreter
     :initarg :subordinate-interpreter
     :initform (make-instance 'single-threaded-interpreter))
    (skip-noops
     :accessor skip-noops :initarg :skip-noops
-    :initform t)))
+    :initform t)
+   (onlinep
+    :accessor onlinep :initarg :onlinep
+    :initform t))
+  (:documentation
+   "An interpreter that executes actions and delegates all other activities to
+   a subordinate interpreter.  Subclasses of EXECUTING-INTERPRETER need only
+   override EXECUTE-PRIMITIVE ACTION."))
 
-(defmethod initialize-instance :after ((self printing-interpreter) &key)
+(defmethod initialize-instance :after ((self executing-interpreter) &key)
   (setf (superordinate-interpreter (subordinate-interpreter self))
           self))
 
-
-(define-delegates printing-interpreter subordinate-interpreter
+(define-delegates executing-interpreter subordinate-interpreter
   (context (interpreter))
+  (reset-interpreter (interpreter))
   (interpret-1 (interpreter term situation))
-  (reset-interpreter (interpreter &optional complete?))
-  (can-continue-execution-p (interpreter))
-  (next-term (interpreter))
-  (onlinep (interpreter))
-  ((setf onlinep) (new-value interpreter))
-  (try-to-finish-interpretation (interpreter situation))
-  (execute-stored-actions (interpreter))
-  (make-choice-point (interpreter term situation))
-  (add-choice-point (interpreter term situation))
-  (next-choice-point (interpreter))
-  (backtrack (interpreter &key reason (continuation-function 'interpret-1)))
+  (prove (interpreter term &key solution-depth quantification-function))
+  (can-execute-p (interpreter primitive-action-term situation
+                              &key solution-depth))
+  (make-continuation (interpreter term situation deferred-proofs))
+  (make-continuation-generator (interpreter term situation deferred-proofs reason answer))
   (the-empty-program-term (interpreter))
   (the-no-operation-term (interpreter)))
 
+(defmethod interpret-1
+    ((interpreter executing-interpreter) (term search-term) situation)
+  (declare (ignore situation))
+  (let ((old-onlinep (onlinep interpreter)))
+    (setf (onlinep interpreter) nil)
+    (multiple-value-bind (action new-situation substitution continuations)
+        (call-next-method)
+      (setf (onlinep interpreter) old-onlinep)
+      (values action
+              new-situation
+              substitution
+              nil
+              continuations))))
+
+
+;;; Printing Interpreter
+;;; ====================
+
+(defclass printing-interpreter (executing-interpreter)
+  ()
+  (:documentation
+   "An interpreter that executes primitive action by printing them."))
+
 (defmethod execute-primitive-action
     ((interpreter printing-interpreter) (term primitive-action-term))
-  (when (and (onlinep interpreter) (contains-variable-p term))
+  (when (and (contains-variable-p term))
     (cerror "Continue execution anyway."
             'unbound-variable-during-online-execution))
   (unless (and (skip-noops interpreter) (typep term 'no-operation-term))

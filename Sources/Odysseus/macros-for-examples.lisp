@@ -11,6 +11,7 @@
 
 (defmacro defexample (name (&key hidden? 
                                  (max-solution-depth odysseus::*default-max-solution-depth*)
+                                 (interpret-function 'interpret)
                                  set-up-function
                                  keys)
                       &body term)
@@ -22,4 +23,6 @@
                   :max-solution-depth ,max-solution-depth
                   :keys ,keys
                   :set-up-function ,set-up-function
+                  :interpret-function ,interpret-function
                   :hidden? ,hidden?))
+

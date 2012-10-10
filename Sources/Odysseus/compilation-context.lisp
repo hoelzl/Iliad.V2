@@ -8,6 +8,7 @@
 (in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
+(in-suite odysseus-syntax-suite)
 
 ;;; Forward Declarations from the Parser
 ;;; ====================================
@@ -89,12 +90,12 @@ etc. for this context."))
         (when *warn-for-null-operator-sorts*
           (warn "No sort declaration for operator ~A." operator)))))
 
-(defgeneric unique-terms (context)
+(defgeneric terms-with-unique-names (context)
   (:documentation
    "Returns a sequence containing all terms in CONTEXT for which unique names
    axioms should be generated."))
 
-(defgeneric add-unique-term (term context)
+(defgeneric add-to-terms-with-unique-names (term context)
   (:documentation
    "Adds a unique TERM to CONTEXT.  Has no effect if TERM is already a unique
    term for context."))
@@ -164,30 +165,6 @@ etc. for this context."))
 ;;; TODO: See (setf known-operators).
 (defgeneric (setf primitive-actions) (new-value context))
 
-(define-condition no-definition-for-primitive-action
-    (runtime-error)
-  ((name :initarg :name)
-   (context :initarg :context))
-  (:report (lambda (condition stream)
-             (with-slots (name context) condition 
-               (format stream "No primitive action ~A in context ~:W"
-                       name context)))))
-
-;;; TODO: We probably should not have both PRIMITIVE-ACTION-DEFINITION
-;;; and LOOKUP-PRIMITIVE-ACTION.
-(defgeneric lookup-primitive-action (name context &optional default)
-  (:documentation
-   "Look up the definition of the primitive action NAME in CONTEXT.")
-  (:method (name (context compilation-context)
-            &optional (default nil default-supplied-p))
-    (or (primitive-action-definition name context nil)
-        (if default-supplied-p
-            default
-            (cerror "Return NIL."
-                    'no-definition-for-primitive-action
-                    :name name :context context)))))
-
-
 ;;; Operator and Context Mixins
 ;;; ===========================
 
@@ -212,17 +189,34 @@ etc. for this context."))
 ;;; Primitive Action Definitions
 ;;; ============================
 
+
+(define-condition no-definition-for-primitive-action
+    (runtime-error)
+  ((name :initarg :name)
+   (context :initarg :context))
+  (:report (lambda (condition stream)
+             (with-slots (name context) condition 
+               (format stream "No primitive action ~A in context ~:W"
+                       name context)))))
+
 (defgeneric primitive-action-definition (action-name context &optional default)
   (:documentation 
-   "Returns the definition of the primitive action ACTION-NAME in CONTEXT.")
+   "Returns the definition of the primitive action ACTION-NAME in
+   CONTEXT.  Signals an error if no primitive action exists and no
+   DEFAULT is supplied.")
   (:method ((action-name symbol) (context compilation-context)
-            &optional (default nil))
-    (gethash action-name (primitive-actions context) default)))
+            &optional (default nil default-supplied-p))
+    (or (gethash action-name (primitive-actions context) nil)
+        (if default-supplied-p
+            default
+            (cerror "Return NIL."
+                    'no-definition-for-primitive-action
+                    :name action-name :context context)))))
 
 (defgeneric (setf primitive-action-definition) (new-value action-name context)
   (:documentation
    "Set the definition for primitive action ACTION-NAME in CONTEXT to
-NEW-VALUE.")
+   NEW-VALUE.")
   (:method (new-value (action-name symbol) context)
     (setf (gethash action-name (primitive-actions context)) new-value)))
 
@@ -254,40 +248,54 @@ NEW-VALUE.")
                               `(assert ',precondition) context)))
       (setf (slot-value self 'action-precondition) precondition-term))))
 
+
+(defmethod primitive-action-definition
+    ((definition primitive-action-definition) context &optional default)
+  (declare (ignore context default))
+  definition)
+
+
+(define-condition declaring-undefined-primitive-action (runtime-error)
+  ((operator :initarg :operator))
+  (:report (lambda (condition stream)
+             (with-slots (operator) condition
+               (format stream "Declaring undefined primitive action ~A."
+                       operator)))))
+
 (defgeneric declare-primitive-action (operator context &optional class-name)
   (:documentation
    "Create a new instance of PRIMITIVE-ACTION-DEFINITION and assign it as
 primitive-action definition for OPERATOR in CONTEXT.")
   (:method ((operator symbol) (context compilation-context)
             &optional (class-name (symbolicate operator '#:-term)))
-    (cerror "Continue anyway."
-            "Declaring undefined primitive action.")
+    (cerror "Create a direct instance of PRIMITIVE-ACTION-DEFINITION."
+            'declaring-undefined-primitive-action
+            :operator operator)
     (setf (primitive-action-definition operator context)
           (make-instance 'primitive-action-definition
             :operator operator :class class-name :context context))))
 
 (defun define-primitive-action (operator signature
                                 &key (class-name  (symbolicate operator '#:-term))
-                                     precondition)
-  (c2mop:ensure-class class-name :direct-superclasses '(primitive-action-term))
-  (define-method 'operator
-    :specializers (list (find-class class-name))
-    :lambda-list '(term)
-    :body `(lambda (term)
-             (declare (ignore term))
-             ',operator))
-  (define-method 'declare-primitive-action
-    :specializers (list (c2mop:intern-eql-specializer operator)
-                        (find-class 'compilation-context))
-    :lambda-list `(operator context &optional (class-name ',class-name))
-    :body `(lambda (operator context &optional (class-name ',class-name))
-             (setf (primitive-action-definition operator context)
-                   (make-instance 'primitive-action-definition
-                     :operator ',operator
-                     :signature ',signature
-                     :class class-name
-                     :precondition ',precondition
-                     :context context)))))
+                                     precondition
+                                     force-redefinition)
+  (when (or (not (find-class class-name nil)) force-redefinition)
+    (ensure-class class-name :direct-superclasses '(primitive-action-term))
+    (ensure-method #'operator `(lambda (term)
+                                 (declare (ignore term))
+                                 ',operator)
+                   :specializers (list (find-class class-name)))
+    (ensure-method #'declare-primitive-action
+                   `(lambda (operator context &optional (class-name ',class-name))
+                      (setf (primitive-action-definition operator context)
+                            (make-instance 'primitive-action-definition
+                              :operator ',operator
+                              :signature ',signature
+                              :class class-name
+                              :precondition ',precondition
+                              :context context)))
+                   :specializers (list (intern-eql-specializer operator)
+                                       (find-class 'compilation-context)))))
 
 
 
@@ -307,9 +315,8 @@ primitive-action definition for OPERATOR in CONTEXT.")
 (defgeneric fluent-definition (fluent-name context &optional default)
   (:documentation
    "Returns the definition of the fluent FLUENT-NAME in CONTEXT.")
-  (:method ((fluent-name symbol) context &optional (default nil))
-    (assert context (context)
-            "Cannot look up fluent symbol without context.")
+  (:method ((fluent-name symbol) (context compilation-context)
+            &optional (default nil))
     (gethash fluent-name (fluents context) default)))
 
 (defgeneric (setf fluent-definition) (new-value fluent-name context)
@@ -331,15 +338,15 @@ primitive-action definition for OPERATOR in CONTEXT.")
 
 
 (defmethod initialize-instance :after
-    ((self fluent-definition) &key context operator fluent-successor-state)
+    ((self fluent-definition) &key context operator successor-state)
   (assert context (context)
           "Cannot create a fluent definition without context.")
   (assert (and operator (symbolp operator)) (operator)
           "Cannot create a fluent definition without operator.")
   (setf (fluent-definition operator context) self)
-  (when (and fluent-successor-state (consp fluent-successor-state))
+  (when (and successor-state (consp successor-state))
     (setf (slot-value self 'fluent-successor-state)
-          (parse-into-term-representation fluent-successor-state context))))
+          (parse-into-term-representation successor-state context))))
 
 
 (defclass relational-fluent-definition (fluent-definition)
@@ -358,27 +365,26 @@ fluent definition for OPERATOR in CONTEXT.")
 
 (defun define-relational-fluent (operator signature
                                  &key (class-name (symbolicate operator '#:-term))
-                                      successor-state)
-  (c2mop:ensure-class class-name
-                      :direct-superclasses '(known-general-application-term))
-  (define-method 'operator
-    :specializers (list (find-class class-name))
-    :lambda-list '(term)
-    :body `(lambda (term)
-             (declare (ignore term))
-             ',operator))
-  (define-method 'declare-primitive-action
-    :specializers (list (c2mop:intern-eql-specializer operator)
-                        (find-class 'compilation-context))
-    :lambda-list `(operator context &optional (class-name ',class-name))
-    :body `(lambda (operator context &optional (class-name ',class-name))
-             (setf (fluent-definition operator context)
-                   (make-instance 'relational-fluent-definition
-                     :operator ',operator
-                     :signature ',signature
-                     :class class-name
-                     :successor-state ',successor-state
-                     :context context)))))
+                                      successor-state
+                                      force-redefinition)
+  (when (or (not (find-class class-name nil)) force-redefinition)
+    (ensure-class class-name
+                  :direct-superclasses '(known-general-application-term))
+    (ensure-method #'operator `(lambda (term)
+                                 (declare (ignore term))
+                                 ',operator)
+                   :specializers (list (find-class class-name)))
+    (ensure-method #'declare-primitive-action
+                   `(lambda (operator context &optional (class-name ',class-name))
+                      (setf (fluent-definition operator context)
+                            (make-instance 'relational-fluent-definition
+                              :operator ',operator
+                              :signature ',signature
+                              :class class-name
+                              :successor-state ',successor-state
+                              :context context)))
+                   :specializers (list (intern-eql-specializer operator)
+                                       (find-class 'compilation-context)))))
 
 
 (defclass functional-fluent-definition (fluent-definition)
@@ -397,24 +403,24 @@ fluent definition for OPERATOR in CONTEXT.")
 
 (defun define-functional-fluent (operator signature
                                  &key (class-name (symbolicate operator '#:-term))
-                                      successor-state)
-  (c2mop:ensure-class class-name
-                      :direct-superclasses '(known-general-application-term))
-  (define-method 'operator
-    :specializers (list (find-class class-name))
-    :lambda-list '(term)
-    :body `(lambda (term)
-             (declare (ignore term))
-             ',operator))
-  (define-method 'declare-primitive-action
-    :specializers (list (c2mop:intern-eql-specializer operator)
-                        (find-class 'compilation-context))
-    :lambda-list `(operator context &optional (class-name ',class-name))
-    :body `(lambda (operator context &optional (class-name ',class-name))
-             (setf (fluent-definition operator context)
-                   (make-instance 'functional-fluent-definition
-                     :operator ',operator
-                     :signature ',signature
-                     :class class-name
-                     :successor-state ',successor-state
-                     :context context)))))
+                                      successor-state
+                                      force-redefinition)
+  (when (or (not (find-class class-name nil)) force-redefinition)
+    (ensure-class class-name
+                  :direct-superclasses '(known-general-application-term))
+    (ensure-method #'operator `(lambda (term)
+                                 (declare (ignore term))
+                                 ',operator)
+                   :specializers (list (find-class class-name)))
+    (ensure-method #'declare-primitive-action
+                   `(lambda (operator context &optional (class-name ',class-name))
+                      (setf (fluent-definition operator context)
+                            (make-instance 'functional-fluent-definition
+                              :operator ',operator
+                              :signature ',signature
+                              :class class-name
+                              :successor-state ',successor-state
+                              :context context)))
+                   :specializers (list (intern-eql-specializer operator)
+                                       (find-class 'compilation-context)))))
+

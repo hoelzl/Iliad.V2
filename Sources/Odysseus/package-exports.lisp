@@ -17,8 +17,6 @@
       #:online-mode-error
       ;; Tracing
       #:trace-odysseus-p #:trace-odysseus #:untrace-odysseus
-      ;; MOP
-      #:define-method
       ;; Lisp implementation
       #:*features-for-lisp-types*
       #:feature-for-lisp-type
@@ -42,8 +40,11 @@
       #:odysseus-utilities-suite
       #:odysseus-macro-suite
       #:odysseus-syntax-suite
-      #:odysseus-situation-suite
       #:odysseus-parser-suite
+      #:odysseus-situation-suite
+      #:odysseus-snark-suite
+      #:odysseus-continuation-suite
+      #:odysseus-world-suite
       #:odysseus-interpreter-suite
       #:odysseus-compiler-suite
       #:odysseus-builtins-suite
@@ -72,7 +73,7 @@
       #:compilation-context
       #:declarations
       #:declared-operator-sorts #:declare-operator-sort
-      #:unique-terms #:add-unique-term
+      #:terms-with-unique-names #:add-to-terms-with-unique-names
       #:lookup-functor #:lookup-variable #:lookup-number
       #:known-operators #:default-known-operators
       #:primitive-actions #:default-primitive-action-names
@@ -80,7 +81,7 @@
       #:the-empty-program-term #:the-no-operation-term
       #:context-mixin #:context
       #:singleton-terms-mixin
-      #:unique-terms-mixin
+      #:terms-with-unique-names-mixin
       #:compilation-unit
       #:local-context #:enclosing-context #:local-variables))
   
@@ -144,7 +145,7 @@
       #:declaration-term
       #:keywords-mixin #:keywords
       #:local-context-mixin
-      #:unique-term-mixin
+      #:term-with-unique-name-mixin
       #:declared-sort #:successor-state
       #:named-declaration-term
       #:sort-declaration-term
@@ -257,25 +258,27 @@
   
   (defvar *odysseus-interpreter-exports*
     '(#:no-state-for-situation
-      #:no-next-choice-point
+      #:no-next-continuation
       #:no-backtracking-in-online-mode
-      #:no-choice-point-creation-in-online-mode
+      #:no-continuation-creation-in-online-mode
       #:unbound-variable-during-online-execution
+      #:cannot-execute-primitive-action
 
       #:interpreter
+      #:subordinate-interpreter
       #:reset-interpreter
       #:interpreter-memento
       #:prove
       #:can-execute-p
-      #:choice-point
+      #:continuation
       #:term #:situation #:interpreter-memento
-      #:make-choice-point
-      #:add-choice-point
-      #:next-choice-point
+      #:make-continuation
+      #:add-continuation
+      #:next-continuation
       #:backtrack
       #:stored-actions
       #:execute-stored-actions #:execute-primitive-action
-      #:stored-continuations
+      #:continuation-terms
       #:deferred-proofs
       #:state-map #:can-set-state-p #:state
       #:maybe-output-trace-information
@@ -298,7 +301,7 @@
 
       #:top-level-context
       #:basic-interpreter
-      #:choice-points #:onlinep
+      #:continuations #:onlinep
       #:printing-interpreter
 
       #:default-interpreter
@@ -306,7 +309,7 @@
 
       #:*continue-after-undecidable-test*
       #:*continue-after-undecidable-precondition*
-      #:maybe-add-choice-point
+      #:maybe-add-continuation
       #:interpret-1
       #:skip-noops #:print-everything
       #:interpret

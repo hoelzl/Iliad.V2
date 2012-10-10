@@ -8,7 +8,7 @@
 (in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
-(5am:in-suite odysseus-parser-suite)
+(in-suite odysseus-parser-suite)
 
 (defgeneric starts-with-question-mark-p (name)
   (:documentation
@@ -32,8 +32,8 @@
     (declare (ignore term context))
     :do-nothing)
 
-  (:method :after ((term unique-term-mixin) context)
-    (add-unique-term term context))
+  (:method :after ((term term-with-unique-name-mixin) context)
+    (add-to-terms-with-unique-names term context))
 
   (:method ((term constant-declaration-term) context)
     (declare-constant-sort term context))

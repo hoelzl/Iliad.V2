@@ -96,9 +96,10 @@
     (assert '(not (is-parent-p matthias s0)))
     ))
 
-#+(or)
-(define-procedure control (x.person y.person s.situation)
-  (celebrate lenz))
+
+(defexample one-step-01 (:set-up-function nil
+                         :interpret-function 'interpret-one-step)
+  ())
 
 (defexample interpret-01 (:set-up-function 'set-up-ewsc-theory)
   (celebrate annabelle))

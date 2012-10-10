@@ -28,19 +28,83 @@
 ;;; Single-Step Interpretation of single threads
 ;;; --------------------------------------------
 
+(defun backtrack
+    (&optional (continuation-generator (the-empty-continuation-generator)))
+  (values nil nil (the-empty-substitution) nil continuation-generator))
+
 (defmethod interpret-1
     ((interpreter single-threaded-interpreter) (term empty-program-term) situation)
-  "Return a noop and another empty term (this is probably a bug)."
+  "Return a NO-OPERATION-TERM`, the current situation, an empty situation, NIL
+to indicate no new proof oblications and an empty continuation generator."
   (values (the-no-operation-term interpreter)
-          term ;; FIXME: This should be an error term.
-          situation))
+          situation
+          (the-empty-substitution)
+          nil
+          (the-empty-continuation-generator)))
 
-(defvar *store-all-non-refuted-proof-terms* nil
-  "If true, add all proof terms (preconditions and tests) that were not
-  refuted to the list of deferred proof-terms.")
+
+(defmethod make-continuation-generator
+    ((interpreter single-threaded-interpreter) term situation deferred-proofs
+     reason answer)
+    "The default method for SINGLE-THREADED-INTERPRETER returns a continuation
+generator only if a proof was found that contains substitutions that do not
+only consist of variables."
+    (if (proof-and-substitution-found reason answer)
+        (make-instance 'continuation-generator
+          :interpreter interpreter
+          :term (clone-multi-solution-term-increasing-depth term)
+          :situation situation
+          :deferred-proofs deferred-proofs)
+        (the-empty-continuation-generator)))
+
+(defmethod make-continuation-generator
+    ((interpreter single-threaded-interpreter) (term primitive-action-term)
+     situation deferred-proofs reason answer)
+    "Never generate new continuations for primitive actions without
+preconditions since there is no way that they can produce variable bindings."
+  (declare (ignore situation deferred-proofs reason answer))
+  (if (action-precondition term)
+      (call-next-method)
+      (the-empty-continuation-generator)))
+
 
 (defvar *continue-after-undecidable-test* t
   "If true, continue interpretation after undecidable tests without failing.")
+
+(defun interpret-1-test-success
+    (interpreter term situation
+     &key (reason (required-argument :reason))
+          (free-variables (required-argument :free-variables))
+          (answer (required-argument :answer))
+          (deferred-proofs nil)
+          (log-message (required-argument :log-message)))
+  "Perform the main work of INTERPRET-1 when TERM should be evaluated, either
+because its test evaluated to true, or because its precondition is undecidable
+and we continue anyway."
+  (declare (type interpreter interpreter)
+           (type test-term term)
+           (type situation situation)
+           (type list free-variables)
+           (type list answer)
+           (type (or null term) deferred-proofs)
+           (type string log-message))
+  (let* ((continuation-generator
+           (make-continuation-generator
+            interpreter term situation '() reason answer))
+         (substitution (make-substitution-for-interpreter
+                        interpreter free-variables answer)))
+    ;; We only need the substitution in TERM for tracing.  The
+    ;; substitution operation could be optimized away when no trace
+    ;; output is generated.
+    (setf term (apply-substitution term substitution)
+          situation (apply-substitution situation substitution))
+    (maybe-output-execution-trace-information
+     log-message term reason free-variables answer)
+    (values (the-no-operation-term interpreter)
+            situation
+            substitution
+            deferred-proofs
+            continuation-generator)))
 
 (defmethod interpret-1
     ((interpreter single-threaded-interpreter) (term test-term) situation)
@@ -48,71 +112,65 @@
       (prove interpreter (argument term)
              :solution-depth (solution-depth term)
              :quantification-function 'existentially-quantify)
-    (maybe-add-choice-point interpreter term situation reason answer)
-    (cond (holds?
-           (when *store-all-non-refuted-proof-terms*
-             (push (argument term) (deferred-proofs interpreter)))
-           (multiple-value-setq (term situation)
-             (perform-substitutions-in-interpreter
-              interpreter term situation free-variables answer))
-           (maybe-output-execution-trace-information
-            ">>> Successful test:" term reason free-variables answer)
-           (values (the-no-operation-term interpreter)
-                   (the-empty-program-term interpreter)
-                   situation))
-          ((or (eql reason :undecidable) (eql reason :timeout))
-           (cond (*continue-after-undecidable-test*
-                  (push (argument term)
-                        (deferred-proofs interpreter))
-                  (multiple-value-setq (term situation)
-                    (perform-substitutions-in-interpreter
-                     interpreter term situation free-variables answer))
-                  (maybe-output-execution-trace-information
-                   ">>> Continuing after:"
-                   term (list reason :continue) free-variables answer)
-                  (values (the-no-operation-term interpreter)
-                          (the-empty-program-term interpreter)
-                          situation))
-                 (t
-                  (maybe-output-execution-trace-information
-                   ">>> Failing after:"
-                   term (list reason :fail) free-variables answer)
-                  (backtrack interpreter))))
-          (t
-           (maybe-add-choice-point interpreter term situation reason answer)
-           (maybe-output-execution-trace-information
-            ">>> Failed test:" term reason free-variables answer)
-           (backtrack interpreter)))))
+      (cond (holds?
+             (interpret-1-test-success interpreter term situation
+                                       :reason reason
+                                       :free-variables free-variables
+                                       :answer answer
+                                       :log-message ">>> Successful test:"))
+            ((or (eql reason :undecidable) (eql reason :timeout))
+             (cond (*continue-after-undecidable-test*
+                    (interpret-1-test-success interpreter term situation
+                                              :reason (list reason :continue)
+                                              :free-variables free-variables
+                                              :answer answer
+                                              :deferred-proofs (argument term)
+                                              :log-message ">>> Continuing after:"))
+                   (t
+                    (maybe-output-execution-trace-information
+                     ">>> Failing after:" term (list reason :fail)
+                     free-variables answer)
+                    (backtrack))))
+            (t
+             (maybe-output-execution-trace-information
+              ">>> Failed test:" term reason free-variables answer)
+             (backtrack)))))
+
 
 (defvar *continue-after-undecidable-precondition* nil
   "If true, continue interpretation (without failing) after actions with
   undecidable preconditions.")
 
 (defun interpret-1-primitive-action-success
-    (interpreter term situation reason free-variables answer)
+    (interpreter term situation
+     &key (reason (required-argument :reason))
+          (free-variables (required-argument :free-variables))
+          (answer (required-argument :answer))
+          (deferred-proofs nil))
   "Perform the main work of INTERPRET-1 when TERM should be evaluated, either
 because its precondition is true, or because its precondition is undecidable
 and we continue anyway."
-  (multiple-value-setq (term situation)
-    (perform-substitutions-in-interpreter
-     interpreter term situation free-variables answer))
-  (cond ((onlinep interpreter)
-         (maybe-output-execution-trace-information
-          ">>> Executing" term reason free-variables answer)
-         (values term
-                 (the-empty-program-term interpreter)
-                 (make-instance 'successor-situation
-                   :action term
-                   :previous-situation situation)))
-        (t
-         (maybe-output-execution-trace-information
-          "Storing:" term reason free-variables answer)
-         (push term (stored-actions interpreter))
-         (values (the-no-operation-term interpreter)
-                 (the-empty-program-term interpreter)
-                 (make-instance 'successor-situation
-                   :action term
-                   :previous-situation situation)))))
+  (declare (type primitive-action-term term)
+           (type situation situation)
+           (type list free-variables)
+           (type list answer)
+           (type (or null term) deferred-proofs))
+  (let* ((continuation-generator
+           (make-continuation-generator
+            interpreter term situation '() reason answer))
+         (substitution (make-substitution-for-interpreter
+                        interpreter free-variables answer)))
+    (setf term (apply-substitution term substitution)
+          situation (apply-substitution situation substitution))
+    (maybe-output-execution-trace-information
+     ">>> Successful precondition:" term reason free-variables answer)
+    (values term
+            (make-instance 'successor-situation
+              :action term
+              :previous-situation situation)
+            substitution
+            deferred-proofs
+            continuation-generator)))
 
 
 (defmethod interpret-1
@@ -120,25 +178,25 @@ and we continue anyway."
   (multiple-value-bind (can-execute-p reason free-variables answer)
       (can-execute-p interpreter term situation
                      :solution-depth (solution-depth term))
-    (maybe-add-choice-point interpreter term situation reason answer)
     (cond (can-execute-p
-           (when *store-all-non-refuted-proof-terms*
-             (push (precondition-term term situation)
-                   (deferred-proofs interpreter)))
-           (interpret-1-primitive-action-success
-            interpreter term situation reason free-variables answer))
+           (interpret-1-primitive-action-success interpreter term situation
+                                                 :reason reason
+                                                 :free-variables free-variables
+                                                 :answer answer))
           ((and (or (eql reason :undecidable) (eql reason :timeout))
                 *continue-after-undecidable-precondition*)
-           (push (precondition-term term situation)
-                 (deferred-proofs interpreter))
            (when *trace-odysseus*
              (format t "~&Continuing after undecidable precondition!~%"))
            (interpret-1-primitive-action-success
-            interpreter term situation reason free-variables answer))
+            interpreter term situation
+            :reason reason
+            :free-variables free-variables
+            :answer answer
+            :deferred-proofs (precondition-term term situation)))
           (t
            (maybe-output-execution-trace-information
             "NOT Executing:" term reason free-variables answer)
-           (backtrack interpreter)))))
+           (backtrack)))))
 
 (defvar *optimize-interpretation-of-declarations* t)
 
@@ -157,22 +215,20 @@ and we continue anyway."
 	   (interpret-1 interpreter
                         (the-empty-program-term interpreter)
                         situation))
-	  (t
-           (push (make-instance (class-of term)
-                   :context (context term)
-                   :source :generated-term
-                   :body (rest body))
-                 (stored-continuations interpreter))
-	   (multiple-value-bind (action rest-term new-situation)
-	       (interpret-1 interpreter (first body) situation)
+	  ((multiple-value-bind (action new-situation substitution
+                                 deferred-proofs continuation-generator)
+               (interpret-1 interpreter (first body) situation)
              (values action
-                     (if (is-final-term-p rest-term)
-                         (the-empty-program-term interpreter)
-                         (make-instance (class-of term)
-                           :context (context term)
-                           :source :generated-term
-                           :body rest-term))
-                     new-situation))))))
+                     new-situation
+                     substitution
+                     deferred-proofs
+                     (extend-continuations
+                      continuation-generator (rest body) substitution)))))))
+
+;;; In the new semantics the interpretation of SEQ and SEARCH is
+;;; exactly the same, since the one-step interpreter does not care (or
+;;; even know) about the execution mode.  The difference is only
+;;; visible in the driver.
 
 (defmethod interpret-1
     ((interpreter single-threaded-interpreter) (term sequence-term) situation)
@@ -180,34 +236,29 @@ and we continue anyway."
 
 (defmethod interpret-1
     ((interpreter single-threaded-interpreter) (term search-term) situation)
-  (let ((old-onlinep (onlinep interpreter)))
-    (setf (onlinep interpreter) nil)
-    (multiple-value-bind (action rest-term new-situation)
-        (interpret-1-body-term interpreter term situation)
-      (setf (onlinep interpreter) old-onlinep)
-      (values action
-              rest-term
-              new-situation))))
+  (interpret-1-body-term interpreter term situation))
 
 (defvar *permute-offline-choice* t)
 
 (defmethod interpret-1
     ((interpreter single-threaded-interpreter) (term action-choice-term) situation)
-  (if (onlinep interpreter)
-      (interpret-1 interpreter (random-elt (body term)) situation)
-      (progn
-        (mapcar (lambda (choice)
-                  (add-choice-point interpreter choice situation))
-                (if *permute-offline-choice*
-                    (shuffle (body term))
-                    (body term)))
-        (backtrack interpreter :reason "Starting action choice"))))
+  (let ((continuations
+          (mapcar (lambda (choice)
+                    (make-continuation interpreter choice situation nil))
+                  (if *permute-offline-choice*
+                      (shuffle (body term))
+                      (body term)))))
+    (values nil nil (the-empty-substitution) nil continuations)))
 
 (defmethod interpret-1
     ((interpreter single-threaded-interpreter) (term declaration-term) situation)
   ;; NOTE: The implementation of INTERPRET-1 for sequence terms picks off
   ;; declarations at the start of sequences.  Therefore, if the implementation
   ;; of this method changes you need to adjust INTERPRET-1-BODY-TERM as well.
+  ;; (This will definitely happen once we have functions and macros, since we
+  ;; can then remove the special treatment of declarations in the parser.)
   (values (the-no-operation-term interpreter)
-          (the-empty-program-term interpreter)
-          situation))
+          situation
+          (the-empty-substitution)
+          nil
+          (the-empty-continuation-generator)))

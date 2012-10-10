@@ -8,6 +8,7 @@
 (in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
+(in-suite odysseus-syntax-suite)
 
 (defvar *report-to-sexpr-errors* nil)
 
@@ -29,11 +30,14 @@
     (to-sexpr-maybe-error :unreadable-term))
 
   (:method ((term variable-term) &key as-list include-global)
-    (if as-list
-        `(,(unique-name term) :sort ,(slot-value term 'declared-sort)
-          ,@(when (and include-global (global term))
-              `(:global ,(global term))))
-        (unique-name term)))
+    (let ((unique-name (if (slot-boundp term 'unique-name)
+                           (slot-value term 'unique-name)
+                           (name term))))
+      (if as-list
+          `(,unique-name :sort ,(slot-value term 'declared-sort)
+            ,@(when (and include-global (global term))
+                `(:global ,(global term))))
+          unique-name)))
 
   (:method ((term number-term) &key as-list include-global)
     (declare (ignore as-list include-global))
@@ -465,7 +469,7 @@
 
 (defgeneric make-unique-names-axioms (compilation-context)
   (:method ((context compilation-context))
-    (let* ((terms (unique-terms context))
+    (let* ((terms (terms-with-unique-names context))
            (length (length terms)))
       (iterate outer
         (for i from 0 below (1- length))

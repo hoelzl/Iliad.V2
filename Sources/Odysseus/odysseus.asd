@@ -7,12 +7,16 @@
   :author "Matthias Hoelzl <tc@xantira.com>"
   :license "MIT, see file LICENSE"
   :depends-on (#:alexandria
-	       #-(or ecl abcl) #:closer-mop
-	       #:fiveam
+	       #:closer-mop
+	       #+swank
+	       #:hu.dwim.stefil+swank
+	       #-swank
+	       #:hu.dwim.stefil
                #:iterate
 	       #:snark)
   :components ((:file "package-exports")
 	       (:file "packages")
+	       (:file "test-suites")
 	       (:file "utilities")
 	       (:file "macros")
 	       (:file "compilation-context")
@@ -22,6 +26,10 @@
 	       (:file "term-operations")
 	       (:file "parser")
 	       (:file "snark")
+	       (:file "substitution")
+	       (:file "continuation")
+	       (:file "world")
 	       (:file "interpreter")
 	       (:file "single-threaded-interpreter")
+	       #+(or)
 	       (:file "constraint-solving")))

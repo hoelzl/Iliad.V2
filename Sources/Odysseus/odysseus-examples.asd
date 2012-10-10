@@ -7,9 +7,11 @@
   :author "Matthias Hoelzl <tc@xantira.com>"
   :license "MIT, see file LICENSE"
   :depends-on (#:alexandria
-	       #:fiveam
+	       #+swank
+	       #:hu.dwim.stefil+swank
+	       #-swank
+	       #:hu.dwim.stefil
                #:iterate
-	       #-(or ecl abcl)
 	       #:closer-mop
 	       #:odysseus)
   :components ((:file "macros-for-examples")

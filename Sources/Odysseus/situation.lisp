@@ -8,6 +8,7 @@
 (in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
+(in-suite odysseus-situation-suite)
 
 (defclass situation ()
   ()
@@ -30,4 +31,3 @@
 (defgeneric in-situation (term situation)
   (:documentation
    "Replace the initial situation with SITUATION in TERM."))
-	

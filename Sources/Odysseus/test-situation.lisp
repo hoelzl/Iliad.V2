@@ -5,19 +5,16 @@
 ;;; This file is licensed under the MIT license; see the file LICENSE
 ;;; in the root directory for further information.
 
-(in-package #:odysseus-tests)
+(in-package #:odysseus)
 
-#+5am
-(5am:in-suite odysseus-situation-suite)
+(in-suite odysseus-situation-suite)
 
-#+5am
-(5am:test (test-initial-situation :compile-at :definition-time)
-  (5am:is (eq 's0 (to-sexpr (make-instance 'initial-situation)))))
+(deftest test-initial-situation ()
+  (is (eq 's0 (to-sexpr (make-instance 'initial-situation)))))
 
-#+5am
-(5am:test (test-successor-situation :compile-at :definition-time)
+(deftest test-successor-situation ()
   (let ((cc (make-instance 'compilation-unit)))
-    (5am:is (equalp '(do (say "Hi!") s0)
+    (is (equalp '(do (say "Hi!") s0)
 		    (to-sexpr
 		     (make-instance
 		      'successor-situation
@@ -30,7 +27,7 @@
 			       :context cc)
 		      :previous-situation (make-instance 'initial-situation)))))
     ;; Simpler way to write the test (but it depends on the parser):
-    (5am:is (equalp '(do (say "Hi!") s0)
+    (is (equalp '(do (say "Hi!") s0)
 		    (to-sexpr
 		     (make-instance
 		      'successor-situation

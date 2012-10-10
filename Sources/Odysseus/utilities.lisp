@@ -8,6 +8,7 @@
 (in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
+(in-suite odysseus-utilities-suite)
 
 ;;; Names
 ;;; =====
@@ -25,6 +26,7 @@
     :documentation "The name of the entity that inherits this mixin."))
   (:documentation
    "Mixin inherited by all classes that require a name."))
+
 
 ;;; Errors
 ;;; ======
@@ -57,7 +59,6 @@
                (format stream "Incompatible sort declarations for ~W: ~W, ~W."
                        thing sort-1 sort-2)))))
 
-
 (define-condition online-mode-error (runtime-error)
   ()
   (:documentation
@@ -78,6 +79,11 @@
 (defun untrace-odysseus ()
   (setf *trace-odysseus* nil))
 
+(defvar *odysseus-trace-output* *trace-output*)
+
+(defun trace-format (format-string &rest args)
+  (when *trace-odysseus*
+    (apply #'format *odysseus-trace-output* format-string args)))
 
 ;;; Information about the Lisp version
 ;;; ==================================
@@ -181,34 +187,13 @@ appear in the symbol map as different symbols."
   "A simple (inefficient and probably incorrect) implementation of type 4
 UUIDs."
   (format stream
-          "~{~X~}-~{~X~}-4~{X~X~}-A~{~X~}-~{~X~}"
+          "~{~X~}-~{~X~}-4~{~X~}-A~{~X~}-~{~X~}"
           (random-hex-list 8) (random-hex-list 4)
           (random-hex-list 3) (random-hex-list 3)
           (random-hex-list 12)))
 
 (defun make-uuid-symbol (&optional (package (find-package '#:keyword)))
   (intern (make-uuid) package))
-
-;;; Helper Methods for the MOP
-;;; ==========================
-
-(defun define-method (generic-function-name
-                      &key (qualifiers '()) specializers lambda-list body)
-  (let* ((gf (ensure-generic-function generic-function-name))
-         (method-class (c2mop:generic-function-method-class gf)))
-    (multiple-value-bind (fun initargs)
-        (c2mop:make-method-lambda gf
-                                  (c2mop:class-prototype method-class)
-                                  body
-                                  nil)
-      (add-method gf
-                  (apply #'make-instance method-class
-                         :qualifiers qualifiers
-                         :specializers specializers
-                         :lambda-list lambda-list
-                         :function (compile nil fun)
-                         initargs)))))
-
 
 ;;; Helper Methods for Macro Definitions
 ;;; ====================================
@@ -255,50 +240,3 @@ UUIDs."
           args)
     bottom-result))
 
-;;; Testing
-;;; =======
-
-
-#+5am
-(5am:def-suite odysseus-suite
-  :description "The suite containing all tests for Odysseus.")
-
-#+5am
-(5am:def-suite odysseus-utilities-suite
-  :in odysseus-suite
-  :description "Tests for utilities.")
-
-#+5am
-(5am:def-suite odysseus-macro-suite
-  :in odysseus-suite
-  :description "Tests for macros.")
-
-#+5am
-(5am:def-suite odysseus-syntax-suite
-  :in odysseus-suite
-  :description "Tests for the syntax representation.")
-
-#+5am
-(5am:def-suite odysseus-situation-suite
-  :in odysseus-suite
-  :description "Tests for the situations.")
-
-#+5am
-(5am:def-suite odysseus-parser-suite
-  :in odysseus-suite
-  :description "Tests for the parser.")
-
-#+5am
-(5am:def-suite odysseus-interpreter-suite
-  :in odysseus-suite
-  :description "Tests for the interpreter.")
-
-#+5am
-(5am:def-suite odysseus-compiler-suite
-  :in odysseus-suite
-  :description "Tests for the compiler.")
-
-#+5am
-(5am:def-suite odysseus-builtins-suite
-  :in odysseus-suite
-  :description "Tests for the built-in predicates.")

@@ -17,6 +17,8 @@
   "If true, try to instantiate variables with known constants if a proof
   remains undecidable.")
 
+;;; TODO: This should really be lazy.  Maybe write it as an ITERATE
+;;; driver?
 (defun instantiations-for (vars context)
   (if (null vars)
       '(())
@@ -60,6 +62,7 @@
             (values t new-situation))))))
   (values nil :no-situation-available))
 
+;;; FIXME
 (defmethod try-to-finish-interpretation ((interpreter basic-interpreter) situation)
   (when *trace-odysseus*
     (format t "~&Starting deferred actions.~%"))
@@ -84,6 +87,70 @@
         (progn
           (execute-stored-actions interpreter)
           (values t situation)))))
+
+;;; FIXME
+(defmethod backtrack ((interpreter interpreter)
+                      &key reason (continuation-function 'interpret-1))
+  (let ((continuation (next-continuation interpreter)))
+    (when (onlinep interpreter)
+      (cerror "Backtrack anyway."
+              'no-backtracking-in-online-mode))
+    (when *trace-odysseus*
+      (format t "~&~:[Backtracking~;~:*~A~].~%" reason))
+    (setf (interpreter-memento interpreter)
+          (interpreter-memento continuation))
+    (funcall continuation-function
+             interpreter (term continuation) (situation continuation))))
+
+
+(define-condition no-next-term (online-mode-error)
+  ((interpreter :initarg :interpreter))
+  (:report (lambda (condition stream)
+             (with-slots (interpreter) condition
+               (format stream "Interpreter ~A has no next term."
+                       interpreter)))))
+
+(define-condition unbound-variable-during-online-execution (online-mode-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "Cannot execute actions containing variables in online mode."))))
+
+(define-condition no-continuation-creation-in-online-mode (online-mode-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "Cannot create a choice point in online mode."))))
+
+
+(define-condition no-backtracking-in-online-mode (online-mode-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream
+                     "Cannot backtrack to a previous choice point in online mode."))))
+
+
+(define-condition no-next-continuation (runtime-error)
+  ()
+  (:report (lambda (condition stream)
+             (declare (ignore condition))
+             (format stream "Tried to backtrack, but no continuation is left.")))) 
+
+(defmethod next-continuation ((interpreter basic-interpreter))
+  (if (null (continuations interpreter))
+      (error 'no-next-continuation)
+      ;; This should be controllable by an execution strategy.
+      (pop (continuations interpreter))))
+
+
+(defmethod run-interpreter-loop ((interpreter executing-interpreter) term situation)
+  (multiple-value-bind (action new-situation substitution
+                        deferred-proofs continuation-generator)
+      (interpret-1 interpreter term situation)
+    (unless (typep action 'no-operation-term)
+      (assert (onlinep interpreter) ()
+              "Cannot execute actions while the interpreter is offline."))))
 
 
 (defvar *suppress-interpretation-errors* t)

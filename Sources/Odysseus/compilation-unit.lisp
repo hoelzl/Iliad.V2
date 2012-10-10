@@ -8,6 +8,7 @@
 (in-package #:odysseus)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
+(in-suite odysseus-syntax-suite)
 
 
 ;;; Singelton Terms Mixin
@@ -33,28 +34,31 @@
 (defmethod the-no-operation-term ((self singleton-terms-mixin))
   "Return the no-operation term.  Cache the value in SELF."
   (or (slot-value self 'the-no-operation-term)
-      (set (slot-value self 'the-no-operation-term)
-           (make-instance 'no-operation-term :context self))))
+      (setf (slot-value self 'the-no-operation-term)
+            (make-instance 'no-operation-term :context self))))
 
 
 ;;; Unique Terms Mixin
 ;;; ==================
 
-(defclass unique-terms-mixin ()
-  ((unique-terms
-    :accessor unique-terms :initarg :unique-terms
-    :initform (make-array '(16) :element-type 'term :adjustable t :fill-pointer 0)))
+(defclass terms-with-unique-names-mixin ()
+  ((terms-with-unique-names
+    :accessor terms-with-unique-names
+    :initarg :terms-with-unique-names
+    :initform (make-array '(16) :element-type 'term
+                                :adjustable t :fill-pointer 0)))
   (:documentation
-   "A mixin that provides storage and methods for obtaining the unique terms
-   of a context."))
+   "A mixin that provides storage for terms for which unique names axioms
+   should be generated."))
 
-(defmethod add-unique-term (term (context unique-terms-mixin))
-  (let ((position (position term (unique-terms context) 
+(defmethod add-to-terms-with-unique-names
+    ((term term-with-unique-name-mixin) (context terms-with-unique-names-mixin))
+  (let ((position (position term (terms-with-unique-names context) 
                             :test (lambda (lhs rhs)
                                     (eql (name lhs) (name rhs))))))
     (if position
-        (setf (aref (unique-terms context) position) term)
-        (vector-push-extend term (unique-terms context)))))
+        (setf (aref (terms-with-unique-names context) position) term)
+        (vector-push-extend term (terms-with-unique-names context)))))
 
 ;;; Compilation units
 ;;; =================
@@ -77,7 +81,7 @@
   *default-primitive-action-names*)
 
 (defclass compilation-unit
-    (compilation-context singleton-terms-mixin unique-terms-mixin)
+    (compilation-context singleton-terms-mixin terms-with-unique-names-mixin)
   ((declarations 
     :accessor declarations :initarg :declarations
     :initform (make-array '(10) :adjustable t :fill-pointer 0)
@@ -230,7 +234,7 @@
   (declared-operator-sorts (context))
   ((setf declared-operator-sorts) (new-value context))
   (known-operators (context))
-  ((setf known-operator) (new-value context))
+  ((setf known-operators) (new-value context))
   (primitive-actions (context))
   ((setf primitive-actions) (new-value context)
                             :new-value-type list)
@@ -238,6 +242,18 @@
   ((setf fluents) (new-value context))
   (the-empty-program-term (context))
   (the-no-operation-term (context)))
+
+
+;;; Top-Level Contexts
+;;; ==================
+
+              
+(defclass top-level-context (compilation-unit)
+  ()
+  (:documentation
+   "The state of a top-level interpreter."))
+
+
 
 ;;; Some utilities for interactive exploration
 ;;; ==========================================

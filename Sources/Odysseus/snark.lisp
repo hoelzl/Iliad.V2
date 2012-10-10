@@ -8,6 +8,7 @@
 (in-package #:odysseus-snark)
 #+debug-odysseus
 (declaim (optimize (debug 3) (space 1) (speed 0) (compilation-speed 0)))
+;; (hu.dwim.stefil:in-suite odysseus-snark-suite)
 
 (defvar *print-snark-output* nil)
 (defvar *run-time-limit* 0.2)
