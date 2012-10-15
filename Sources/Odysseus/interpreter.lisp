@@ -74,28 +74,29 @@ Returns five values:
 
 * A SUBSTITUTION for the variables obtained by the constraint solver.
 
-* A deferred proof or NIL if either no proof was needed or if the proof was
-  successful.
+* A list of deferred proofs.  This is the empty list iff either no proof was
+  needed or if the proof was successful.
 
 * A CONTINUATION-GENERATOR that can generate all continuations resuming this
   computation.")
 
   (:method :around ((interpreter interpreter) (term term) situation)
+    #+(or) (declare (optimize (debug 3)))
     "A method for testing purposes; checks that we actually return the right
 number and types of arguments.."
     (declare (ignore situation))
     (multiple-value-bind
-          (action situation substitution deferred-proof continuation-generator)
+          (action situation substitution deferred-proofs continuation-generator)
         (call-next-method)
       (check-type action (or null primitive-action-term))
       (check-type situation (or null situation))
       (check-type substitution substitution)
-      (check-type deferred-proof (or null term))
+      (check-type deferred-proofs (or null term))
       (check-type continuation-generator continuation-generator)
       (values action
               situation
               substitution
-              deferred-proof
+              deferred-proofs
               continuation-generator)))
 
   (:method ((interpreter interpreter) (term term) situation)
@@ -378,8 +379,8 @@ EXISTENTIALLY-QUANTIFY."))
 IGNORE-VARIABLE-ONLY-ANSWERS is true, then returns true only if a proof was
 found and ANSWER contain at least one non-variable value."
   (when (and (eql reason :proof-found)
-           (consp answer)
-           (rest answer))
+             (consp answer)
+             (rest answer))
     (if ignore-variable-only-answers
         (not (every (lambda (elt)
                       (typep elt 'snark::variable))
@@ -418,9 +419,7 @@ found and ANSWER contain at least one non-variable value."
   (can-execute-p (interpreter primitive-action-term situation
                               &key solution-depth))
   (make-continuation (interpreter term situation deferred-proofs))
-  (make-continuation-generator (interpreter term situation deferred-proofs reason answer))
-  (the-empty-program-term (interpreter))
-  (the-no-operation-term (interpreter)))
+  (make-continuation-generator (interpreter term situation deferred-proofs reason answer)))
 
 (defmethod interpret-1
     ((interpreter executing-interpreter) (term search-term) situation)

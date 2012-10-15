@@ -257,6 +257,22 @@
       #:prove-using-snark-closure
       #:prove-using-snark))
   
+  (defvar *odysseus-continuation-exports*
+    '(#:term
+      #:situation
+      #:deferred-proofs
+      #:continuation
+      #:continuation-generator
+      #:continuations
+      #:peek-next-continuation
+      #:pop-next-continuation
+      #:add-continuation
+      #:append-continuations
+      #:empty-continuation-generator
+      #:the-empty-continuation-generator
+      #:list-continuation-generator
+      #:extend-continuation))
+
   (defvar *odysseus-interpreter-exports*
     '(#:no-state-for-situation
       #:no-next-continuation

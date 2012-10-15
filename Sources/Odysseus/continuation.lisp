@@ -87,10 +87,20 @@
    from the sequence of continuations that CONTINUATION-GENERATOR will
    produce.  Returns NIL if no next continuation exists."))
 
+(defgeneric add-continuation (continuation-generator continuation)
+  (:documentation
+   "Returns a CONTINUATION-GENERATOR containing all contiunations of
+   CONTINUATION-GENERATOR as well as CONTINUATION.")
+
+  (:method ((gen continuation-generator) (cont continuation))
+    (make-instance 'continuation-generator
+      :continuations (cons cont (continuations gen)))))
+
 (defgeneric append-continuations (gen1 gen2)
   (:documentation
    "Returns a CONTINUATION-GENERATOR that returns the continuations of
    generators gen1 and gen2.  May be identical to one of its arguments.")
+
   (:method ((gen1 continuation-generator) (gen2 continuation-generator))
     (make-instance 'continuation-generator
       :continuations (append (continuations gen1) (continuations gen2)))))

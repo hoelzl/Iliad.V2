@@ -70,6 +70,11 @@
                 . #.*odysseus-snark-exports*)
   (:export . #.*odysseus-snark-exports*))
 
+(defpackage #:odysseus-continuations
+  (:use #:odysseus)
+  (:nicknames #:continuations #:cont)
+  (:export . #.*odysseus-continuation-exports*))
+
 (defpackage #:odysseus-interpreter
   (:use #:odysseus)
   (:nicknames #:interpreter #:interp)

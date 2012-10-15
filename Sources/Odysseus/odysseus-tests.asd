@@ -23,4 +23,5 @@
 	       (:file "test-substitution")
 	       (:file "test-continuation")
 	       (:file "test-parser")
-	       (:file "test-interpreter")))
+	       (:file "test-interpreter")
+	       (:file "test-single-threaded-interpreter")))

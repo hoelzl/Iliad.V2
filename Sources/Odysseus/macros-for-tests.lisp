@@ -48,3 +48,104 @@
                          call-term call-term-0 call-term-1 call-term-2 call-term-3
                          subst situation))
      ,@body))
+
+(defmacro with-interpreter (&body body)
+  `(with-terms
+     (let* ((osnark::*use-resolution-only* t)
+            (osnark::*run-time-limit* 0.05)
+            (osnark::*ida-run-time-limit* 0.05)
+            (*trace-odysseus* nil)
+            (interp (make-instance 'basic-interpreter))
+            (context (context interp))
+            (var1 (make-instance 'variable-term
+                    :name 'var1
+                    :sort 'var1-sort
+                    :context context))
+            (var2 (make-instance 'variable-term
+                    :name 'var2
+                    :sort 'var2-sort
+                    :is-bound-p t
+                    :context context))
+            (zero (make-instance 'number-term
+                    :value 0
+                    :context context))
+            (x (parse-into-term-representation '?x.x-sort context))
+            (y (parse-into-term-representation '?y.y-sort context))
+            (z (parse-into-term-representation '?z.z-sort context))
+            (action-name 'action-for-with-interpreter-macro)
+            (action-class-name 'action-class-for-with-interpreter-macro)
+            (relation-name 'relation-for-with-interpreter-macro)
+            (theory `((declare-sort 'x-sort)
+                      (declare-sort 'y-sort)
+                      (declare-relation ',relation-name 2 :sort '(t t))
+                      (assert '(,relation-name ?v1 ?v2))
+                      (assert '(poss (,action-name ?x.x-sort ?y.y-sort) ?s)))))
+       (declare (ignorable interp context
+                           var1 var2 zero x y z
+                           action-name action-class-name theory))
+       (mapc (lambda (term)
+               (vector-push-extend (parse-into-term-representation term (context interp))
+                                   (declarations (context interp))))
+             theory)
+       (define-primitive-action action-name '(t t)
+         :class-name action-class-name
+         :precondition `(poss (,action-name ?x ?y) s)
+         :force-redefinition t)
+       (declare-primitive-action action-name (context interp))
+       (declare-operator-sort action-name '(t t) (context interp))
+       (let ((action-term (make-instance action-class-name
+                            :arguments (list x y)
+                            :context (context interp))))
+         (declare (ignorable action-term))
+         ,@body))))
+
+(defmacro with-single-threaded-interpreter (&body body)
+  `(with-terms
+     (let* ((osnark::*use-resolution-only* t)
+            (osnark::*run-time-limit* 0.05)
+            (osnark::*ida-run-time-limit* 0.05)
+            (*trace-odysseus* nil)
+            (interp (make-instance 'single-threaded-interpreter))
+            (context (context interp))
+            (var1 (make-instance 'variable-term
+                    :name 'var1
+                    :sort 'var1-sort
+                    :context context))
+            (var2 (make-instance 'variable-term
+                    :name 'var2
+                    :sort 'var2-sort
+                    :is-bound-p t
+                    :context context))
+            (zero (make-instance 'number-term
+                    :value 0
+                    :context context))
+            (x (parse-into-term-representation '?x.x-sort context))
+            (y (parse-into-term-representation '?y.y-sort context))
+            (z (parse-into-term-representation '?z.z-sort context))
+            (action-name 'action-for-with-single-threaded-interpreter-macro)
+            (action-class-name 'action-class-for-with-single-threaded-interpreter-macro)
+            (relation-name 'relation-for-with-single-threaded-interpreter-macro)
+            (theory `((declare-sort 'x-sort)
+                      (declare-sort 'y-sort)
+                      (declare-relation ',relation-name 2 :sort '(t t))
+                      (assert '(,relation-name ?v1 ?v2))
+                      (assert '(poss (,action-name ?x.x-sort ?y.y-sort) ?s)))))
+       (declare (ignorable interp context
+                           var1 var2 zero x y z
+                           action-name action-class-name theory))
+       (mapc (lambda (term)
+               (vector-push-extend (parse-into-term-representation term (context interp))
+                                   (declarations (context interp))))
+             theory)
+       (define-primitive-action action-name '(t t)
+         :class-name action-class-name
+         :precondition `(poss (,action-name ?x ?y) s)
+         :force-redefinition t)
+       (declare-primitive-action action-name (context interp))
+       (declare-operator-sort action-name '(t t) (context interp))
+       (let ((action-term (make-instance action-class-name
+                            :arguments (list x y)
+                            :context (context interp))))
+         (declare (ignorable action-term))
+         ,@body))))
+

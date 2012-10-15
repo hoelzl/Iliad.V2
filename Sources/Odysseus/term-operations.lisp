@@ -143,7 +143,7 @@
 
 
 (defmethod print-object ((self term) stream)
-  (print-unreadable-object (self stream :type t)
+  (print-unreadable-object (self stream :type t :identity t)
     (format stream "~:W" (to-sexpr self))))
 
 (defmethod print-object ((term variable-term) stream)

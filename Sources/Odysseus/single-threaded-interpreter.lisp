@@ -49,13 +49,14 @@ to indicate no new proof oblications and an empty continuation generator."
     "The default method for SINGLE-THREADED-INTERPRETER returns a continuation
 generator only if a proof was found that contains substitutions that do not
 only consist of variables."
-    (if (proof-and-substitution-found reason answer)
-        (make-instance 'continuation-generator
-          :interpreter interpreter
-          :term (clone-multi-solution-term-increasing-depth term)
-          :situation situation
-          :deferred-proofs deferred-proofs)
-        (the-empty-continuation-generator)))
+  (declare (ignore interpreter))
+  (if (proof-and-substitution-found reason answer)
+      (make-instance 'continuation-generator
+        :continuations (list (make-instance 'continuation
+                               :term (clone-multi-solution-term-increasing-depth term)
+                               :situation situation
+                               :deferred-proofs deferred-proofs)))
+      (the-empty-continuation-generator)))
 
 (defmethod make-continuation-generator
     ((interpreter single-threaded-interpreter) (term primitive-action-term)
@@ -67,9 +68,6 @@ preconditions since there is no way that they can produce variable bindings."
       (call-next-method)
       (the-empty-continuation-generator)))
 
-
-(defvar *continue-after-undecidable-test* t
-  "If true, continue interpretation after undecidable tests without failing.")
 
 (defun interpret-1-test-success
     (interpreter term situation
@@ -86,8 +84,10 @@ and we continue anyway."
            (type situation situation)
            (type list free-variables)
            (type list answer)
-           (type (or null term) deferred-proofs)
+           (type (or list term) deferred-proofs)
            (type string log-message))
+  (when (typep deferred-proofs 'term)
+    (setf deferred-proofs (list deferred-proofs)))
   (let* ((continuation-generator
            (make-continuation-generator
             interpreter term situation '() reason answer))
@@ -105,6 +105,9 @@ and we continue anyway."
             substitution
             deferred-proofs
             continuation-generator)))
+
+(defvar *continue-after-undecidable-test* t
+  "If true, continue interpretation after undecidable tests without failing.")
 
 (defmethod interpret-1
     ((interpreter single-threaded-interpreter) (term test-term) situation)
@@ -154,7 +157,9 @@ and we continue anyway."
            (type situation situation)
            (type list free-variables)
            (type list answer)
-           (type (or null term) deferred-proofs))
+           (type (or list term) deferred-proofs))
+  (when (typep deferred-proofs 'term)
+    (setf deferred-proofs (list deferred-proofs)))
   (let* ((continuation-generator
            (make-continuation-generator
             interpreter term situation '() reason answer))
@@ -201,6 +206,7 @@ and we continue anyway."
 (defvar *optimize-interpretation-of-declarations* t)
 
 (defun interpret-1-body-term (interpreter term situation)
+  (declare (optimize (debug 3)))
   (let ((body (body term)))
     ;; Since most programs start with a long list of declarations that do
     ;; nothing, pick them off here.  This makes the traces of INTERPRET-1 more
@@ -211,19 +217,33 @@ and we continue anyway."
         (if (typep (first body) 'declaration-term)
             (setf body (rest body))
             (leave))))
-    (cond ((null body)
-	   (interpret-1 interpreter
-                        (the-empty-program-term interpreter)
-                        situation))
-	  ((multiple-value-bind (action new-situation substitution
-                                 deferred-proofs continuation-generator)
-               (interpret-1 interpreter (first body) situation)
-             (values action
-                     new-situation
-                     substitution
-                     deferred-proofs
-                     (extend-continuations
-                      continuation-generator (rest body) substitution)))))))
+    (if (null body)
+        (interpret-1 interpreter
+                     (the-empty-program-term interpreter)
+                     situation)
+        (multiple-value-bind (action new-situation substitution
+                              deferred-proofs continuation-generator)
+            (interpret-1 interpreter (first body) situation)
+          ;; This is probably wrong.  We need to extend the continuations with
+          ;; the correct term type.
+          (let ((new-continuations (extend-continuations continuation-generator
+                                                         (rest body)
+                                                         substitution)))
+            (values action
+                    new-situation
+                    substitution
+                    deferred-proofs
+                    (if (rest body)
+                        (add-continuation 
+                         new-continuations
+                         (make-instance 'continuation
+                           :term (make-instance (class-of term)
+                                   :body (apply-substitution (rest body) substitution)
+                                   :context (context interpreter)
+                                   :source :generated-term)
+                           :situation new-situation
+                           :deferred-proofs deferred-proofs))
+                        new-continuations)))))))
 
 ;;; In the new semantics the interpretation of SEQ and SEARCH is
 ;;; exactly the same, since the one-step interpreter does not care (or
@@ -248,7 +268,12 @@ and we continue anyway."
                   (if *permute-offline-choice*
                       (shuffle (body term))
                       (body term)))))
-    (values nil nil (the-empty-substitution) nil continuations)))
+    (values nil
+            nil
+            (the-empty-substitution)
+            nil
+            (make-instance 'continuation-generator
+              :continuations continuations))))
 
 (defmethod interpret-1
     ((interpreter single-threaded-interpreter) (term declaration-term) situation)

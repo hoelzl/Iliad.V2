@@ -65,10 +65,6 @@
 
 (deftest test-interpreter-forward-declarations ()
   (let ((interpreter (make-instance 'interpreter)))
-    (is (not (eql (the-empty-program-term interpreter)
-                  (the-empty-program-term (context interpreter)))))
-    (is (not (eql (the-no-operation-term interpreter)
-                  (the-no-operation-term (context interpreter)))))
     (setf (primitive-action-definition 'foo interpreter)
           (make-instance 'primitive-action-definition
             :operator 'foo
@@ -119,7 +115,9 @@
          (action-name 'action-for-test-can-execute-for-basic-interpreter-01)
          (action-class-name 'action-for-test-can-execute-for-basic-interpreter-01-term))
     (vector-push-extend theory (declarations (context interp)))
-    (define-primitive-action action-name '(t t) :class-name action-class-name)
+    (define-primitive-action action-name '(t t)
+      :class-name action-class-name
+      :force-redefinition t)
     (declare-primitive-action action-name (context interp))
     (let ((action (make-instance action-class-name
                     :context (context interp))))
@@ -142,8 +140,10 @@
                              (poss (,action-name ?x ?y) ?s)))
                   (context interp))))
     (vector-push-extend theory (declarations (context interp)))
-    (define-primitive-action action-name '(t t) :class-name action-class-name
-      :precondition `(poss (,action-name ?x ?y) s))
+    (define-primitive-action action-name '(t t)
+      :class-name action-class-name
+      :precondition `(poss (,action-name ?x ?y) s)
+      :force-redefinition t)
     (declare-primitive-action action-name (context interp))
     (declare-operator-sort action-name '(t t) (context interp))
     (let ((action-term (make-instance action-class-name
@@ -160,33 +160,15 @@
         (is (eql nil answer))))))
 
 (deftest test-can-execute-for-basic-interpreter-03 ()
-  (with-terms
-    (let* ((osnark::*use-resolution-only* t)
-           (*trace-odysseus* nil)
-           (interp (make-instance 'basic-interpreter))
-           (action-name 'action-for-test-can-execute-for-basic-interpreter-03)
-           (action-class-name 'action-for-test-can-execute-for-basic-interpreter-03-term)
-           (theory `((declare-sort 'x-sort)
-                     (declare-sort 'y-sort)
-                     (assert '(poss (,action-name ?x.x-sort ?y.y-sort) ?s)))))
-      (mapc (lambda (term)
-              (vector-push-extend (parse-into-term-representation term (context interp))
-                                  (declarations (context interp))))
-            theory)
-      (define-primitive-action action-name '(t t) :class-name action-class-name
-        :precondition `(poss (,action-name ?x ?y) s))
-      (declare-primitive-action action-name (context interp))
-      (declare-operator-sort action-name '(t t) (context interp))
-      (let ((action-term (make-instance action-class-name
-                           :arguments (list x y)
-                           :context (context interp))))
-        (is (typep (primitive-action-definition action-name (context interp))
-                   'primitive-action-definition))
-        (is (equalp '(t t) (declared-sort action-term (context interp))))
-        (multiple-value-bind (result reason free-variables answer)
-            (can-execute-p interp action-term (the-initial-situation))
-          (is (eql t result))
-          (is (eql :proof-found reason))
-          (is (equalp (list x y) free-variables))
-          (is (= 3 (length answer))))))))
+  (with-interpreter
+    (is (typep (primitive-action-definition action-name (context interp))
+               'primitive-action-definition))
+    (is (equalp '(t t) (declared-sort action-term (context interp))))
+    (multiple-value-bind (result reason free-variables answer)
+        (can-execute-p interp action-term (the-initial-situation))
+      (is (eql t result))
+      (is (eql :proof-found reason))
+      (is (equalp (list x y) free-variables))
+      (is (= 3 (length answer))))))
 
+    

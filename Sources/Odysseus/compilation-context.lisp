@@ -142,14 +142,24 @@ etc. for this context."))
 (defgeneric the-empty-program-term (context)
   (:documentation
    "Returns an instance of EMPTY-PROGRAM-TERM for CONTEXT that might be interned.")
+
   (:method ((context compilation-context))
-    (make-instance 'empty-program-term :context context)))
+    (cond ((next-method-p)
+           (call-next-method))
+          (t
+           (warn "Generating uninterned empty program term")
+           (make-instance 'empty-program-term :context context)))))
 
 (defgeneric the-no-operation-term (context)
   (:documentation
    "Returns an instance of NO-OPERATION-TERM for CONTEXT that might be interned.")
+
   (:method ((context compilation-context))
-    (make-instance 'no-operation-term :context context)))
+    (cond ((next-method-p)
+           (call-next-method))
+          (t
+           (warn "Generating uninterned no-operation term.")
+           (make-instance 'no-operation-term :context context)))))
 
 ;;; Methods for Obtaining Primitive Actions
 ;;; ---------------------------------------
