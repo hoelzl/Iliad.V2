@@ -632,6 +632,9 @@ or :ARG3 init-keywords is also provided."
   (let ((definition (primitive-action-definition (operator term) (context term))))
     (action-precondition definition)))
 
+(defmethod operator ((term primitive-action-term))
+  :unknown-primitive-action-term)
+
 (define-primitive-action 'no-operation '())
 
 (defclass test-term (unary-term keywords-mixin multi-solution-mixin)

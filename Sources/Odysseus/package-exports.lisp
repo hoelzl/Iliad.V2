@@ -17,6 +17,7 @@
       #:online-mode-error
       ;; Tracing
       #:trace-odysseus-p #:trace-odysseus #:untrace-odysseus
+      #:trace-format
       ;; Lisp implementation
       #:*features-for-lisp-types*
       #:feature-for-lisp-type

@@ -510,9 +510,11 @@
   (:method ((declaration sort-declaration-term)
             &key context rewrite-too supported)
     (declare (ignore rewrite-too supported))
-    (apply #'snark:declare-sort
-           (declared-sort declaration context)
-           (keywords declaration))
+    (let ((sort-name (declared-sort declaration context)))
+      (unless (snark::sort-name? sort-name)
+        (apply #'snark:declare-sort
+               sort-name
+               (keywords declaration))))
     :declare-sort)
   
   (:method ((declaration subsort-declaration-term)

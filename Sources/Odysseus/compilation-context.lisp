@@ -169,7 +169,9 @@ etc. for this context."))
 ;;; ===========================
 
 (defgeneric operator (compound-term)
-  (:documentation "The operator of COMPOUND-TERM."))
+  (:documentation "The operator of COMPOUND-TERM.")
+  (:method (term)
+    :unknown-operator))
 
 (defclass operator-mixin ()
   ((operator :accessor operator :initarg :operator
@@ -217,7 +219,7 @@ etc. for this context."))
   (:documentation
    "Set the definition for primitive action ACTION-NAME in CONTEXT to
    NEW-VALUE.")
-  (:method (new-value (action-name symbol) context)
+  (:method (new-value (action-name symbol) (context compilation-context))
     (setf (gethash action-name (primitive-actions context)) new-value)))
 
 (defclass primitive-action-definition (operator-mixin context-mixin)

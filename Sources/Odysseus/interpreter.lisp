@@ -19,10 +19,16 @@
 ;;; The Class INTERPRETER
 ;;; ---------------------
 
+(defgeneric interpreter-uuid (interpreter)
+  (:documentation
+   "A UUID for INTERPRETER, has to be comparable with EQL."))
+
 (defclass interpreter ()
   ((interpreter-uuid
     :accessor interpreter-uuid :initarg :uuid
-    :initform (make-uuid-symbol)))
+    :initform (make-uuid-symbol))
+   (context :accessor context :initarg :context
+            :initform (make-instance 'top-level-context)))
   (:documentation
    "The base class of all interpreters."))
 
@@ -202,9 +208,10 @@ EXISTENTIALLY-QUANTIFY."))
   (:documentation
    "Creates a new continuation that evaluates TERM in SITUATION.")
   (:method ((interpreter interpreter) term situation deferred-proofs)
-    (when (and *trace-odysseus* *trace-continuation-creation*)
-      (format t "~&Creating continuation for~28T~:W~%    Situation:~28T~:W~%"
-              term situation))
+    (when *trace-continuation-creation*
+      (trace-format
+       "~&Creating continuation for~28T~:W~%    Situation:~28T~:W~%"
+       term situation))
     (make-instance 'continuation
       :term term
       :situation situation
@@ -248,7 +255,9 @@ EXISTENTIALLY-QUANTIFY."))
 
 (defmethod primitive-action-definition
     (action-name (interpreter interpreter) &optional default)
-  (primitive-action-definition action-name (context interpreter) default))
+  (if default
+      (primitive-action-definition action-name (context interpreter) default)
+      (primitive-action-definition action-name (context interpreter))))
 
 (defmethod (setf primitive-action-definition)
     (new-value action-name (interpreter interpreter))
@@ -277,13 +286,19 @@ EXISTENTIALLY-QUANTIFY."))
 ;;; ---------------------------
 
 (defclass basic-interpreter (interpreter)
-  ((context :accessor context :initarg :context
-            :initform (make-instance 'compilation-unit))
-   (superordinate-interpreter
-    :accessor superordinate-interpreter :initarg :subordinate-interpreter
-    :initform nil))
-  (:default-initargs :context (make-instance 'top-level-context)))
+  ((superordinate-interpreter
+    :accessor superordinate-interpreter :initarg :superordinate-interpreter
+    :initform nil)
+   (context :initform nil)))
 
+(defmethod initialize-instance :after ((self basic-interpreter)
+                                       &key (context nil context-supplied-p))
+  (cond (context-supplied-p
+         (setf (context self) context))
+        ((superordinate-interpreter self)
+         (setf (context self) (context (superordinate-interpreter self))))
+        (t
+         (setf (context self) (make-instance 'top-level-context)))))
 
 (defvar *print-snark-refutations* t)
 (defvar *print-snark-undecidables* t)

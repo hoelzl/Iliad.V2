@@ -20,6 +20,11 @@
   (:documentation
    "The initial situation, i.e., the root of a tree of situations."))
 
+(defvar *the-initial-situation* (make-instance 'initial-situation))
+
+(defun the-initial-situation ()
+  *the-initial-situation*)
+
 (defclass successor-situation (situation)
   ((action :accessor action :initarg :action
 	   :initform (required-argument :action))
