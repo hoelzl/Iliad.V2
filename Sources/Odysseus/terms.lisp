@@ -633,6 +633,7 @@ or :ARG3 init-keywords is also provided."
     (action-precondition definition)))
 
 (defmethod operator ((term primitive-action-term))
+  (declare (ignore term))
   :unknown-primitive-action-term)
 
 (define-primitive-action 'no-operation '())

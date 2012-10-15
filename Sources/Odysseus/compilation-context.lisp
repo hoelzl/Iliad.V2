@@ -171,6 +171,7 @@ etc. for this context."))
 (defgeneric operator (compound-term)
   (:documentation "The operator of COMPOUND-TERM.")
   (:method (term)
+    (declare (ignore term))
     :unknown-operator))
 
 (defclass operator-mixin ()
