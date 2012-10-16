@@ -184,7 +184,7 @@
 
 
 
-(defgeneric extend-continuation (continuation terms substitution)
+(defgeneric extend-continuation (continuation terms substitution term-type)
   (:documentation
    "Extends CONTINUATION so that it executes its original term followed by
    TERMS, and applies SUBSTITUTION to the new continuation.  May destructively
@@ -192,34 +192,36 @@
 
   ;; Maybe we should flatten the new body term if both the term of the
   ;; continuation is already a body term?
-  (:method (continuation (term term) substitution)
+  (:method (continuation (term term) substitution term-type)
     (setf (term continuation)
-          (make-instance 'body-term
+          (make-instance term-type
             :body (list (apply-substitution (term continuation) substitution)
                         (apply-substitution term substitution))
             :context (context (term continuation))
             :source :generated-term))
     continuation)
 
-  (:method (continuation (term term) (substitution empty-substitution))
+  (:method (continuation (term term) (substitution empty-substitution) term-type)
     (setf (term continuation)
-          (make-instance 'body-term
+          (make-instance term-type
             :body (list (term continuation) term)
             :context (context (term continuation))
             :source :generated-term))
     continuation)
   
-  (:method (continuation (terms null) substitution)
+  (:method (continuation (terms null) substitution term-type)
+    (declare (ignore term-type))
     (setf (term continuation)
           (apply-substitution (term continuation) substitution))
     continuation)
   
-  (:method (continuation (terms null) (substitution empty-substitution))
+  (:method (continuation (terms null) (substitution empty-substitution) term-type)
+    (declare (ignore terms substitution term-type))
     continuation)
   
-  (:method (continuation (terms cons) substitution)
+  (:method (continuation (terms cons) substitution term-type)
     (setf (term continuation)
-          (make-instance 'body-term
+          (make-instance term-type
             :body (list* (apply-substitution (term continuation) substitution)
                          (mapcar (rcurry #'apply-substitution substitution)
                                  terms))
@@ -227,25 +229,39 @@
             :source :generated-term))
     continuation)
   
-  (:method (continuation (terms cons) (substitution empty-substitution))
+  (:method (continuation (terms cons) (substitution empty-substitution) term-type)
     (setf (term continuation)
-          (make-instance 'body-term
+          (make-instance term-type
             :body (list* (term continuation) terms)
             :context (context (term continuation))
             :source :generated-term))
     continuation))
 
-(defgeneric extend-continuations (continuations terms substitution)
+(defgeneric extend-continuations
+    (continuations terms &key substitution term-type)
   (:documentation
    "Extend each continuation in CONTINUATIONS so that it executes its
    original actions followed by TERMS.")
-  (:method (continuation (term term) substitution)
-    (extend-continuations continuation (list term) substitution))
-  (:method ((continuations sequence) (terms list) substitution)
+
+  (:method (continuation (term term)
+            &key (substitution (the-empty-substitution))
+                 (term-type 'body-term))
+    (extend-continuations continuation (list term)
+                          :substitution substitution
+                          :term-type term-type))
+
+  (:method ((continuations sequence) (terms list)
+            &key (substitution (the-empty-substitution))
+                 (term-type 'body-term))
     (map (class-of continuations)
-         (rcurry 'extend-continuation terms substitution) continuations))
-  (:method ((gen continuation-generator) (terms list) substitution)
+         (rcurry #'extend-continuation terms substitution term-type)
+         continuations))
+
+  (:method ((gen continuation-generator) (terms list)
+            &key (substitution (the-empty-substitution))
+                 (term-type 'body-term))
     (make-instance 'continuation-generator
-      :continuations (extend-continuations (continuations gen)
-                                           terms
-                                           substitution))))
+      :continuations
+      (extend-continuations (continuations gen) terms
+                            :substitution substitution
+                            :term-type term-type))))

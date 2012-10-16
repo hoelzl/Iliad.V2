@@ -107,7 +107,8 @@
                        :deferred-proofs call-term))
            (new-cont (extend-continuation old-cont
                                           call-term-2
-                                          (the-empty-substitution))))
+                                          (the-empty-substitution)
+                                          'body-term)))
       (is (typep new-cont 'continuation))
       (is (typep (term new-cont) 'body-term))
       (let ((body (body (term new-cont))))
@@ -125,7 +126,8 @@
                        :deferred-proofs call-term))
            (new-cont (extend-continuation old-cont
                                           call-term-2
-                                          subst)))
+                                          subst
+                                          'body-term)))
       (is (typep new-cont 'continuation))
       (is (typep (term new-cont) 'body-term))
       (let* ((body (body (term new-cont)))
@@ -150,7 +152,8 @@
                        :deferred-proofs call-term))
            (new-cont (extend-continuation old-cont
                                           '()
-                                          (the-empty-substitution))))
+                                          (the-empty-substitution)
+                                          'body-term)))
       (is (eql old-cont new-cont)))))
 
 (deftest test-extend-continuation-04 ()
@@ -161,7 +164,8 @@
                        :deferred-proofs call-term))
            (new-cont (extend-continuation old-cont
                                           '()
-                                          subst)))
+                                          subst
+                                          'body-term)))
       (is (typep new-cont 'continuation))
       (let ((term (term new-cont)))
         (is (typep term 'unknown-general-application-term))
@@ -179,7 +183,8 @@
                        :deferred-proofs call-term))
            (new-cont (extend-continuation old-cont
                                           (list call-term-2 call-term-3)
-                                          (the-empty-substitution))))
+                                          (the-empty-substitution)
+                                          'body-term)))
       (is (typep new-cont 'continuation))
       (is (typep (term new-cont) 'body-term))
       (let ((body (body (term new-cont))))
@@ -198,7 +203,8 @@
                        :deferred-proofs call-term))
            (new-cont (extend-continuation old-cont
                                           (list call-term-2 call-term-3)
-                                          subst)))
+                                          subst
+                                          'body-term)))
       (is (typep new-cont 'continuation))
       (is (typep (term new-cont) 'body-term))
       (let* ((body (body (term new-cont)))
@@ -262,9 +268,10 @@
                        :term call-term-2
                        :situation situation
                        :deferred-proofs '()))
-             (result (extend-continuations (list cont-1 cont-2)
-                                           call-term-3
-                                           (the-empty-substitution))))
+             (result (extend-continuations
+                      (list cont-1 cont-2)
+                      call-term-3
+                      :substitution (the-empty-substitution))))
         (is (typep result 'cons))
         (is (= 2 (length result)))
         (let ((nc1 (first result))
@@ -281,9 +288,10 @@
                        :deferred-proofs '()))
              (cg (make-instance 'continuation-generator
                    :continuations (list cont-1 cont-2)))
-             (result (extend-continuations cg
-                                           call-term-3
-                                           (the-empty-substitution))))
+             (result (extend-continuations
+                      cg
+                      call-term-3
+                      :substitution (the-empty-substitution))))
         (is (typep result 'continuation-generator))
         (let ((conts (continuations result)))
           (is (typep conts 'cons))

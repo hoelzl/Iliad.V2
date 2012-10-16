@@ -224,16 +224,16 @@ and we continue anyway."
         (multiple-value-bind (action new-situation substitution
                               deferred-proofs continuation-generator)
             (interpret-1 interpreter (first body) situation)
-          ;; This is probably wrong.  We need to extend the continuations with
-          ;; the correct term type.
-          (let ((new-continuations (extend-continuations continuation-generator
-                                                         (rest body)
-                                                         substitution)))
+          (let ((new-continuations
+                  (extend-continuations continuation-generator
+                                        (rest body)
+                                        :substitution substitution
+                                        :term-type (class-of term))))
             (values action
                     new-situation
                     substitution
                     deferred-proofs
-                    (if (rest body)
+                    (if (and action (rest body))
                         (add-continuation 
                          new-continuations
                          (make-instance 'continuation
