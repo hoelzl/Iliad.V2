@@ -32,4 +32,5 @@
 	       (:file "interpreter")
 	       (:file "single-threaded-interpreter")
 	       #+(or)
-	       (:file "constraint-solving")))
+	       (:file "constraint-solving")
+	       (:file "interpreter-loop")))

@@ -78,6 +78,19 @@
                   (continuations (append-continuations cg2 cg3)))))))
 
 
+(deftest test-copy-continuation-generator ()
+  (let* ((cgen (make-instance 'continuation-generator
+                 :continuations '(1 2 3 4)))
+         (cgen-copy (copy-continuation-generator cgen)))
+    (is (typep cgen-copy 'list-continuation-generator))
+    (is (eql (continuations cgen) (continuations cgen-copy)))
+    (is (not (eql cgen cgen-copy))))
+  (let* ((cgen (make-instance 'empty-continuation-generator))
+         (cgen-copy (copy-continuation-generator cgen)))
+    (is (typep cgen-copy 'empty-continuation-generator))
+    (is (not (eql cgen cgen-copy)))))
+
+
 (deftest test-apply-substitution-for-continuation-generators ()
   (with-terms
     (let* ((cg (make-instance 'continuation-generator

@@ -177,12 +177,11 @@ EXISTENTIALLY-QUANTIFY."))
         (error 'non-executing-interpreter-error
                :interpreter interpreter))))
 
-(defgeneric run-interpreter-loop (interpreter term situation)
+(defgeneric run-interpreter-loop (interpreter world)
   (:documentation
-   "Run INTERPRETER until if finishes execution or fails, starting with TERM
-   and in SITUATION.")
-  (:method ((interpreter interpreter) term situation)
-    (declare (ignore term situation))
+   "Run INTERPRETER until if finishes execution or fails, starting in WORLD.")
+  (:method ((interpreter interpreter) world)
+    (declare (ignore world))
     (error 'non-executing-interpreter-error
            :interpreter interpreter)))
 

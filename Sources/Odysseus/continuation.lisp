@@ -182,7 +182,12 @@
       (apply #'make-instance 'list-continuation-generator args)
       *the-empty-continuation-generator*))
 
-
+(defgeneric copy-continuation-generator (continuation-generator)
+  (:method ((cgen continuation-generator))
+    (make-instance (class-of cgen)
+      :continuations (continuations cgen)))
+  (:method ((cgen empty-continuation-generator))
+    (make-instance 'empty-continuation-generator)))
 
 (defgeneric extend-continuation (continuation terms substitution term-type)
   (:documentation

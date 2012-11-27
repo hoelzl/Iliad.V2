@@ -35,6 +35,7 @@
                      (the-initial-situation)))
     (signals non-executing-interpreter-error
       (onlinep interpreter))
+    #+(or)
     (signals non-executing-interpreter-error
       (run-interpreter-loop interpreter empty-term (the-initial-situation)))
     (signals cannot-execute-primitive-action

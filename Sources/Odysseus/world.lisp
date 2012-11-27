@@ -17,6 +17,11 @@
     "The situation in which the world is right now for inference
     purposes.  This state should always be equal to the situation
     resulting from executing STORED-ACTIONS in INITIAL-SITUATION.")
+   (domain-theory
+    :accessor domain-theory :initarg :domain-theory
+    :initform '()
+    :documentation
+    "The set of logical assertions that hold at SITUATION.")
    (initial-situation
     :accessor initial-situation :initarg :initial-situation
     :documentation
@@ -26,7 +31,24 @@
     :initform '()
     :documentation
     "The actions that still have to be executed until WORLD will
-    actually be in its SITUATION.")))
+    actually be in its SITUATION.")
+   (deferred-proofs
+    :accessor deferred-proofs :initarg :deferred-proofs
+    :initform '()
+    :documentation
+     "The proofs that still have to be done before we may apply STORED-ACTIONS.")
+   (substitution
+    :accessor substitution :initarg :substitution
+    :initform (the-empty-substitution)
+    :documentation
+    "The substitution that is needed to go from INITIAL-SITUATION to
+    SITUATION.")
+   (continuation-generator
+    :accessor continuation-generator :initarg :continuation-generator
+    :initform (make-instance 'empty-continuation-generator)
+    :documentation
+    "The continuations for this world, i.e., all possibilities how this world
+    can evolve.")))
 
 (define-condition world-without-initial-situation (runtime-error)
   ((world :initarg :world))
@@ -49,3 +71,18 @@
 (defmethod print-object ((self world) stream)
   (print-unreadable-object (self stream :type t :identity t)
     (format stream "~:W" (to-sexpr (situation self)))))
+
+(defgeneric copy-world (world)
+  (:documentation
+   "Create a fresh copy of WORLD.")
+
+  (:method ((world world))
+    (make-instance (class-of world)
+      :situation (situation world)
+      :domain-theory (domain-theory world)
+      :initial-situation (initial-situation world)
+      :stored-actions (stored-actions world)
+      :deferred-proofs (deferred-proofs world)
+      :substitution (substitution world)
+      :continuation-generator (copy-continuation-generator
+                               (continuation-generator world)))))
